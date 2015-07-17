@@ -76,7 +76,7 @@ object VWTimitFeaturizer extends Logging {
     val vwData = timitFeaturesData.train.labels.zip(vwTrainingFeatures).map {
       case (label, features) =>
         val stringBuilder = new StringBuilder()
-        stringBuilder.append(label).append(" |")
+        stringBuilder.append(label + 1).append(" |")
         (0 until features.length).foreach { i =>
           stringBuilder
               .append(" ")
