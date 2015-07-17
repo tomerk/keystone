@@ -8,7 +8,6 @@ import nodes.learning.BlockLeastSquaresEstimator
 import nodes.stats.{CosineRandomFeatures, StandardScaler}
 import nodes.util.{ClassLabelIndicatorsFromIntLabels, MaxClassifier}
 import org.apache.commons.math3.random.MersenneTwister
-import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
@@ -88,7 +87,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwData.saveAsTextFile(conf.vwFeaturesWriteLocation, classOf[GzipCodec])
+    vwData.saveAsTextFile(conf.vwFeaturesWriteLocation)
   }
 
   object Distributions extends Enumeration {
