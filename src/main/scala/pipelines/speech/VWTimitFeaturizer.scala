@@ -8,6 +8,7 @@ import nodes.learning.BlockLeastSquaresEstimator
 import nodes.stats.{CosineRandomFeatures, StandardScaler}
 import nodes.util.{ClassLabelIndicatorsFromIntLabels, MaxClassifier}
 import org.apache.commons.math3.random.MersenneTwister
+import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
@@ -23,6 +24,7 @@ object VWTimitFeaturizer extends Logging {
     testDataLocation: String = "",
     testLabelsLocation: String = "",
     vwFeaturesWriteLocation: String = "",
+    numCores: Int = 512,
     numParts: Int = 512,
     numCosines: Int = 50,
     gamma: Double = 0.05555,
@@ -87,7 +89,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwData.saveAsTextFile(conf.vwFeaturesWriteLocation)
+    vwData.coalesce(conf.numCores).saveAsTextFile(conf.vwFeaturesWriteLocation, classOf[GzipCodec])
   }
 
   object Distributions extends Enumeration {
@@ -104,6 +106,7 @@ object VWTimitFeaturizer extends Logging {
     opt[String]("testLabelsLocation") required() action { (x,c) => c.copy(testLabelsLocation=x) }
     opt[String]("vwFeaturesWriteLocation") required() action { (x,c) => c.copy(vwFeaturesWriteLocation=x) }
     opt[String]("checkpointDir") action { (x,c) => c.copy(checkpointDir=Some(x)) }
+    opt[Int]("numCores") required() action { (x,c) => c.copy(numCores=x) }
     opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
     opt[Int]("numCosines") action { (x,c) => c.copy(numCosines=x) }
     opt[Int]("numEpochs") action { (x,c) => c.copy(numEpochs=x) }
