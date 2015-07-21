@@ -23,7 +23,8 @@ object VWTimitFeaturizer extends Logging {
     trainLabelsLocation: String = "",
     testDataLocation: String = "",
     testLabelsLocation: String = "",
-    vwFeaturesWriteLocation: String = "",
+    testOutLocation: String = "",
+    trainOutLocation: String = "",
     numCores: Int = 512,
     numParts: Int = 512,
     numCosines: Int = 50,
@@ -90,7 +91,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.vwFeaturesWriteLocation + "/train", classOf[GzipCodec])
+    vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.trainOutLocation + "/train", classOf[GzipCodec])
 
     val vwTestFeatures = featurizer.apply(timitFeaturesData.test.data)
     val vwTestData = timitFeaturesData.test.labels.zip(vwTestFeatures).map {
@@ -108,7 +109,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwTestData.coalesce(conf.numCores).saveAsTextFile(conf.vwFeaturesWriteLocation + "/test", classOf[GzipCodec])
+    vwTestData.coalesce(conf.numCores).saveAsTextFile(conf.testOutLocation + "/test", classOf[GzipCodec])
   }
 
   object Distributions extends Enumeration {
@@ -123,7 +124,8 @@ object VWTimitFeaturizer extends Logging {
     opt[String]("trainLabelsLocation") required() action { (x,c) => c.copy(trainLabelsLocation=x) }
     opt[String]("testDataLocation") required() action { (x,c) => c.copy(testDataLocation=x) }
     opt[String]("testLabelsLocation") required() action { (x,c) => c.copy(testLabelsLocation=x) }
-    opt[String]("vwFeaturesWriteLocation") required() action { (x,c) => c.copy(vwFeaturesWriteLocation=x) }
+    opt[String]("trainOutLocation") required() action { (x,c) => c.copy(trainOutLocation=x) }
+    opt[String]("testOutLocation") required() action { (x,c) => c.copy(testOutLocation=x) }
     opt[String]("checkpointDir") action { (x,c) => c.copy(checkpointDir=Some(x)) }
     opt[Int]("numCores") required() action { (x,c) => c.copy(numCores=x) }
     opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
