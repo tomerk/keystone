@@ -91,7 +91,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.trainOutLocation + "/train", classOf[GzipCodec])
+    vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
 
     val vwTestFeatures = featurizer.apply(timitFeaturesData.test.data)
     val vwTestData = timitFeaturesData.test.labels.zip(vwTestFeatures).map {
@@ -109,7 +109,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwTestData.coalesce(conf.numCores).saveAsTextFile(conf.testOutLocation + "/test", classOf[GzipCodec])
+    vwTestData.coalesce(conf.numCores).saveAsTextFile(conf.testOutLocation, classOf[GzipCodec])
   }
 
   object Distributions extends Enumeration {
