@@ -18,8 +18,8 @@ object VWTimitEval extends Logging {
   def run(sc: SparkContext, conf: TimitConfig) {
     val data = sc.textFile(conf.dataLocation)
     val predictedData = data.pipe(s"${conf.vwLocation} -i ${conf.modelLocation} -t -p /dev/stdout --quiet")
-    val predicted = predictedData.map(_.split(" ")(0).toDouble.toInt)
-    val actual = predictedData.map(_.split(" ")(1).toDouble.toInt)
+    val predicted = predictedData.map(_.split(" ")(0).toDouble.toInt - 1)
+    val actual = predictedData.map(_.split(" ")(1).toDouble.toInt - 1)
     val evaluator = MulticlassClassifierEvaluator(predicted, actual,
       TimitFeaturesDataLoader.numClasses)
     logInfo("TEST Error is " + (100d * evaluator.totalError) + "%")
