@@ -75,10 +75,11 @@ object VWTimitFeaturizer extends Logging {
     } andThen (new StandardScaler(), trainData)
 
     val vwTrainingFeatures = featurizer.apply(trainData)
-    val vwData = timitFeaturesData.train.labels.zip(vwTrainingFeatures).map {
+    val vwTrainData = timitFeaturesData.train.labels.zip(vwTrainingFeatures).map {
       case (label, features) =>
         val stringBuilder = new StringBuilder()
-        stringBuilder.append(label + 1).append(" |")
+        // also make sure to attach the label as a tag so we can keep ground truth next to predictions
+        stringBuilder.append(label + 1).append(" '").append(label + 1).append(" |")
         (0 until features.length).foreach { i =>
           stringBuilder
               .append(" ")
@@ -89,7 +90,25 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwData.coalesce(conf.numCores).saveAsTextFile(conf.vwFeaturesWriteLocation, classOf[GzipCodec])
+    vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.vwFeaturesWriteLocation + "/train", classOf[GzipCodec])
+
+    val vwTestFeatures = featurizer.apply(timitFeaturesData.test.data)
+    val vwTestData = timitFeaturesData.test.labels.zip(vwTestFeatures).map {
+      case (label, features) =>
+        val stringBuilder = new StringBuilder()
+        // also make sure to attach the label as a tag so we can keep ground truth next to predictions
+        stringBuilder.append(label + 1).append(" '").append(label + 1).append(" |")
+        (0 until features.length).foreach { i =>
+          stringBuilder
+              .append(" ")
+              .append(i)
+              .append(":")
+              .append(features(i))
+        }
+        stringBuilder.toString()
+    }
+
+    vwTestData.coalesce(conf.numCores).saveAsTextFile(conf.vwFeaturesWriteLocation + "/test", classOf[GzipCodec])
   }
 
   object Distributions extends Enumeration {
