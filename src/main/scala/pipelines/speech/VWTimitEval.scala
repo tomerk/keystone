@@ -8,7 +8,7 @@ import scopt.OptionParser
 
 
 object VWTimitEval extends Logging {
-  val appName = "Timit"
+  val appName = "VW Timit Eval"
 
   case class TimitConfig(
     dataLocation: String = "",
