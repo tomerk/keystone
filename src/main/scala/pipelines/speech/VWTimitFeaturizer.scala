@@ -89,9 +89,9 @@ object VWTimitFeaturizer extends Logging {
               .append(features(i))
         }
         stringBuilder.toString()
-    }.mapPartitions(i => scala.util.Random.shuffle(i.toArray).toIterator)
+    }
 
-    vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
+    vwTrainData.coalesce(conf.numCores).mapPartitions(i => scala.util.Random.shuffle(i.toArray).toIterator).saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
 
     val vwTestFeatures = featurizer.apply(timitFeaturesData.test.data)
     val vwTestData = timitFeaturesData.test.labels.zip(vwTestFeatures).map {
