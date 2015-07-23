@@ -89,7 +89,7 @@ object VWTimitFeaturizer extends Logging {
               .append(features(i))
         }
         stringBuilder.toString()
-    }
+    }.mapPartitions(i => scala.util.Random.shuffle(i.toArray).toIterator)
 
     vwTrainData.coalesce(conf.numCores).saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
 
