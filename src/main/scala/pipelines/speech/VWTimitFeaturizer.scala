@@ -25,7 +25,6 @@ object VWTimitFeaturizer extends Logging {
     testLabelsLocation: String = "",
     testOutLocation: String = "",
     trainOutLocation: String = "",
-    numCores: Int = 512,
     numParts: Int = 512,
     numCosines: Int = 50,
     gamma: Double = 0.05555,
@@ -55,7 +54,9 @@ object VWTimitFeaturizer extends Logging {
       conf.numParts)
 
     // Build the pipeline
-    val trainData = timitFeaturesData.train.data.cache().setName("trainRaw")
+    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
+    val trainData = trainDataAndLabels.map(_._2)
+    val trainLabels = trainDataAndLabels.map(_._1)
 
     val featurizer = if (conf.rfType == Distributions.Cauchy) {
       // TODO: Once https://github.com/scalanlp/breeze/issues/398 is released,
@@ -76,7 +77,7 @@ object VWTimitFeaturizer extends Logging {
     } andThen (new StandardScaler(), trainData)
 
     val vwTrainingFeatures = featurizer.apply(trainData)
-    val vwTrainData = timitFeaturesData.train.labels.zip(vwTrainingFeatures).map {
+    val vwTrainData = trainLabels.zip(vwTrainingFeatures).map {
       case (label, features) =>
         val stringBuilder = new StringBuilder()
         // also make sure to attach the label as a tag so we can keep ground truth next to predictions
@@ -91,7 +92,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwTrainData.repartition(conf.numCores).saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
+    vwTrainData.saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
 
     val vwTestFeatures = featurizer.apply(timitFeaturesData.test.data)
     val vwTestData = timitFeaturesData.test.labels.zip(vwTestFeatures).map {
@@ -109,7 +110,7 @@ object VWTimitFeaturizer extends Logging {
         stringBuilder.toString()
     }
 
-    vwTestData.coalesce(conf.numCores).saveAsTextFile(conf.testOutLocation, classOf[GzipCodec])
+    vwTestData.saveAsTextFile(conf.testOutLocation, classOf[GzipCodec])
   }
 
   object Distributions extends Enumeration {
@@ -127,7 +128,6 @@ object VWTimitFeaturizer extends Logging {
     opt[String]("trainOutLocation") required() action { (x,c) => c.copy(trainOutLocation=x) }
     opt[String]("testOutLocation") required() action { (x,c) => c.copy(testOutLocation=x) }
     opt[String]("checkpointDir") action { (x,c) => c.copy(checkpointDir=Some(x)) }
-    opt[Int]("numCores") required() action { (x,c) => c.copy(numCores=x) }
     opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
     opt[Int]("numCosines") action { (x,c) => c.copy(numCosines=x) }
     opt[Int]("numEpochs") action { (x,c) => c.copy(numEpochs=x) }
