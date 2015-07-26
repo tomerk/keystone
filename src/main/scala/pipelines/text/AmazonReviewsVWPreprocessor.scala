@@ -19,7 +19,7 @@ object AmazonReviewsVWPreprocessor extends Logging {
 
     val preprocessor = Trim andThen LowerCase() andThen Tokenizer()
 
-    val amazonData = AmazonReviewsDataLoader(sc, conf.dataLocation, conf.threshold).labeledData.cache().randomSplit(Array(0.8, 0.2), 1l)
+    val amazonData = AmazonReviewsDataLoader(sc, conf.dataLocation, conf.threshold).labeledData.repartition(conf.numParts).cache().randomSplit(Array(0.8, 0.2), 1l)
     val trainData = LabeledData(amazonData(0))
     val testData = LabeledData(amazonData(1))
 
@@ -58,7 +58,8 @@ object AmazonReviewsVWPreprocessor extends Logging {
     testOutLocation: String = "",
     threshold: Double = 3.5,
     nGrams: Int = 2,
-    commonFeatures: Int = 100000)
+    commonFeatures: Int = 100000,
+    numParts: Int = 512)
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
@@ -68,6 +69,7 @@ object AmazonReviewsVWPreprocessor extends Logging {
     opt[Double]("threshold") action { (x,c) => c.copy(threshold=x)}
     opt[Int]("nGrams") action { (x,c) => c.copy(nGrams=x) }
     opt[Int]("commonFeatures") action { (x,c) => c.copy(commonFeatures=x) }
+    opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
   }.parse(args, AmazonReviewsConfig()).get
 
   /**
