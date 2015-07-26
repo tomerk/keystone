@@ -1,7 +1,7 @@
 package pipelines.text
 
 import evaluation.BinaryClassifierEvaluator
-import loaders.AmazonReviewsDataLoader
+import loaders.{LabeledData, AmazonReviewsDataLoader}
 import nodes.learning.NaiveBayesEstimator
 import nodes.nlp._
 import nodes.stats.TermFrequency
@@ -19,8 +19,9 @@ object AmazonReviewsVWPreprocessor extends Logging {
 
     val preprocessor = Trim andThen LowerCase() andThen Tokenizer()
 
-    val trainData = AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold)
-    val testData = AmazonReviewsDataLoader(sc, conf.testLocation, conf.threshold)
+    val amazonData = AmazonReviewsDataLoader(sc, conf.dataLocation, conf.threshold).labeledData.cache().randomSplit(Array(0.8, 0.2), 1l)
+    val trainData = LabeledData(amazonData(0))
+    val testData = LabeledData(amazonData(1))
 
     val vwTrainingFeatures = preprocessor.apply(trainData.data)
     val vwTrainData = trainData.labels.zip(vwTrainingFeatures).map {
@@ -52,8 +53,7 @@ object AmazonReviewsVWPreprocessor extends Logging {
   }
 
   case class AmazonReviewsConfig(
-    trainLocation: String = "",
-    testLocation: String = "",
+    dataLocation: String = "",
     trainOutLocation: String = "",
     testOutLocation: String = "",
     threshold: Double = 3.5,
@@ -62,8 +62,7 @@ object AmazonReviewsVWPreprocessor extends Logging {
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
-    opt[String]("trainLocation") required() action { (x,c) => c.copy(trainLocation=x) }
-    opt[String]("testLocation") required() action { (x,c) => c.copy(testLocation=x) }
+    opt[String]("dataLocation") required() action { (x,c) => c.copy(dataLocation=x) }
     opt[String]("trainOutLocation") required() action { (x,c) => c.copy(trainOutLocation=x) }
     opt[String]("testOutLocation") required() action { (x,c) => c.copy(testOutLocation=x) }
     opt[Double]("threshold") action { (x,c) => c.copy(threshold=x)}

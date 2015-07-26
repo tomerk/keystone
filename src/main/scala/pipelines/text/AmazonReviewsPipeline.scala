@@ -1,7 +1,7 @@
 package pipelines.text
 
 import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
-import loaders.{AmazonReviewsDataLoader, NewsgroupsDataLoader}
+import loaders.{LabeledData, AmazonReviewsDataLoader, NewsgroupsDataLoader}
 import nodes.learning.NaiveBayesEstimator
 import nodes.nlp._
 import nodes.stats.TermFrequency
@@ -16,8 +16,9 @@ object AmazonReviewsPipeline extends Logging {
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
-    val trainData = AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold)
-    trainData.labeledData.cache()
+    val amazonData = AmazonReviewsDataLoader(sc, conf.dataLocation, conf.threshold).labeledData.cache().randomSplit(Array(0.8, 0.2), 1l)
+    val trainData = LabeledData(amazonData(0))
+    val testData = LabeledData(amazonData(1))
 
     val training = trainData.data.cache()
     val labels = trainData.labels.cache()
@@ -39,7 +40,6 @@ object AmazonReviewsPipeline extends Logging {
     // Evaluate the classifier
     logInfo("Evaluating classifier")
 
-    val testData = AmazonReviewsDataLoader(sc, conf.testLocation, conf.threshold)
     val testLabels = testData.labels
     val testResults = predictor(testData.data)
     val eval = BinaryClassifierEvaluator(testResults.map(_ > 0), testLabels.map(_ > 0))
@@ -48,16 +48,14 @@ object AmazonReviewsPipeline extends Logging {
   }
 
   case class AmazonReviewsConfig(
-                                    trainLocation: String = "",
-                                    testLocation: String = "",
+                                    dataLocation: String = "",
                                     threshold: Double = 3.5,
                                     nGrams: Int = 2,
                                     commonFeatures: Int = 100000)
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
-    opt[String]("trainLocation") required() action { (x,c) => c.copy(trainLocation=x) }
-    opt[String]("testLocation") required() action { (x,c) => c.copy(testLocation=x) }
+    opt[String]("dataLocation") required() action { (x,c) => c.copy(dataLocation=x) }
     opt[Double]("threshold") action { (x,c) => c.copy(threshold=x)}
     opt[Int]("nGrams") action { (x,c) => c.copy(nGrams=x) }
     opt[Int]("commonFeatures") action { (x,c) => c.copy(commonFeatures=x) }
