@@ -1,7 +1,7 @@
 package nodes.learning
 
 import breeze.linalg.{DenseMatrix, DenseVector, Vector}
-import org.apache.spark.mllib.classification.{LogisticRegressionModel => MLlibLRM, LogisticRegressionWithSGD, NaiveBayes}
+import org.apache.spark.mllib.classification.{LogisticRegressionModel => MLlibLRM, LogisticRegressionWithLBFGS, LogisticRegressionWithSGD, NaiveBayes}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import utils.MLlibUtils.breezeVectorToMLlib
@@ -40,11 +40,21 @@ class LogisticRegressionModel[T <: Vector[Double]](
  *
  * @param lambda The lambda parameter to use for the naive bayes model
  */
-case class LogisticRegressionSGDEstimator[T <: Vector[Double] : ClassTag](numIterations: Int, stepSize: Double, miniBatchFraction: Double)
+case class LogisticRegressionSGDEstimator[T <: Vector[Double] : ClassTag](numIterations: Int, stepSize: Double)
     extends LabelEstimator[T, Double, Int] {
   override def fit(in: RDD[T], labels: RDD[Int]): LogisticRegressionModel[T] = {
     val labeledPoints = labels.zip(in).map(x => LabeledPoint(x._1, breezeVectorToMLlib(x._2)))
-    val model = LogisticRegressionWithSGD.train(labeledPoints, numIterations, stepSize, miniBatchFraction)
+    val model = LogisticRegressionWithSGD.train(labeledPoints, numIterations, stepSize)
+
+    new LogisticRegressionModel(model)
+  }
+}
+
+case class LogisticRegressionLBFGSEstimator[T <: Vector[Double] : ClassTag]()
+    extends LabelEstimator[T, Double, Int] {
+  override def fit(in: RDD[T], labels: RDD[Int]): LogisticRegressionModel[T] = {
+    val labeledPoints = labels.zip(in).map(x => LabeledPoint(x._1, breezeVectorToMLlib(x._2)))
+    val model = new LogisticRegressionWithLBFGS().run(labeledPoints)
 
     new LogisticRegressionModel(model)
   }

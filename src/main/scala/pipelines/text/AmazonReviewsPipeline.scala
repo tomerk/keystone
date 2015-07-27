@@ -2,7 +2,7 @@ package pipelines.text
 
 import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
 import loaders.{LabeledData, AmazonReviewsDataLoader, NewsgroupsDataLoader}
-import nodes.learning.{LogisticRegressionSGDEstimator, NaiveBayesEstimator}
+import nodes.learning.{LogisticRegressionLBFGSEstimator, LogisticRegressionSGDEstimator, NaiveBayesEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.{Cacher, CommonSparseFeatures, MaxClassifier}
@@ -30,7 +30,7 @@ object AmazonReviewsPipeline extends Logging {
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen new Cacher() andThen
-        (LogisticRegressionSGDEstimator(20, 0.5, 1.0), training, labels) andThen Transformer(_ > 0.5)
+        (LogisticRegressionLBFGSEstimator(), training, labels) andThen Transformer(_ > 0.5)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
