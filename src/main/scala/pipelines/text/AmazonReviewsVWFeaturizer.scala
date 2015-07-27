@@ -17,23 +17,21 @@ object AmazonReviewsVWFeaturizer extends Logging {
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
-    val amazonData = AmazonReviewsDataLoader(sc, conf.dataLocation, conf.threshold).labeledData.repartition(conf.numParts).cache().randomSplit(Array(0.8, 0.2), 1l)
-    val trainData = LabeledData(amazonData(0))
-    val testData = LabeledData(amazonData(1))
-
-    val training = trainData.data.cache()
-    val labels = trainData.labels.cache()
+    logInfo("PIPELINE TIMING: Started featurizing training data")
+    val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
+    val training = trainData.data
+    val labels = trainData.labels
 
     // Build the featurizer
-    logInfo("Training classifier")
+    logInfo("Training featurizer")
     val featurizer = Trim andThen LowerCase() andThen
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training)
 
-    val vwTrainingFeatures = featurizer.apply(trainData.data)
-    val vwTrainData = trainData.labels.zip(vwTrainingFeatures).map {
+    val vwTrainingFeatures = featurizer.apply(training)
+    val vwTrainData = labels.zip(vwTrainingFeatures).map {
       case (label, features) =>
         val target = if (label > 0) 1 else -1
         val stringBuilder = new StringBuilder()
@@ -50,7 +48,10 @@ object AmazonReviewsVWFeaturizer extends Logging {
     }
 
     vwTrainData.saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
+    logInfo("PIPELINE TIMING: Finished featurizing training data")
 
+    logInfo("PIPELINE TIMING: Started featurizing test data")
+    val testData = LabeledData(AmazonReviewsDataLoader(sc, conf.testLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
     val vwTestFeatures = featurizer.apply(testData.data)
     val vwTestData = testData.labels.zip(vwTestFeatures).map {
       case (label, features) =>
@@ -69,10 +70,12 @@ object AmazonReviewsVWFeaturizer extends Logging {
     }
 
     vwTestData.saveAsTextFile(conf.testOutLocation, classOf[GzipCodec])
+    logInfo("PIPELINE TIMING: Finished featurizing test data")
   }
 
   case class AmazonReviewsConfig(
-    dataLocation: String = "",
+    trainLocation: String = "",
+    testLocation: String = "",
     trainOutLocation: String = "",
     testOutLocation: String = "",
     threshold: Double = 3.5,
@@ -82,7 +85,8 @@ object AmazonReviewsVWFeaturizer extends Logging {
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
-    opt[String]("dataLocation") required() action { (x,c) => c.copy(dataLocation=x) }
+    opt[String]("trainLocation") required() action { (x,c) => c.copy(trainLocation=x) }
+    opt[String]("testLocation") required() action { (x,c) => c.copy(testLocation=x) }
     opt[String]("trainOutLocation") required() action { (x,c) => c.copy(trainOutLocation=x) }
     opt[String]("testOutLocation") required() action { (x,c) => c.copy(testOutLocation=x) }
     opt[Double]("threshold") action { (x,c) => c.copy(threshold=x)}
