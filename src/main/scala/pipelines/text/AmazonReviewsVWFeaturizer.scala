@@ -35,9 +35,10 @@ object AmazonReviewsVWFeaturizer extends Logging {
     val vwTrainingFeatures = featurizer.apply(trainData.data)
     val vwTrainData = trainData.labels.zip(vwTrainingFeatures).map {
       case (label, features) =>
+        val target = if (label > 0) 1 else -1
         val stringBuilder = new StringBuilder()
         // also make sure to attach the label as a tag so we can keep ground truth next to predictions
-        stringBuilder.append(label + 1).append(" '").append(label + 1).append(" |")
+        stringBuilder.append(target).append(" '").append(target).append(" |")
         features.activeIterator.foreach { case (index, feature) =>
           stringBuilder
               .append(" ")
@@ -53,9 +54,10 @@ object AmazonReviewsVWFeaturizer extends Logging {
     val vwTestFeatures = featurizer.apply(testData.data)
     val vwTestData = testData.labels.zip(vwTestFeatures).map {
       case (label, features) =>
+        val target = if (label > 0) 1 else -1
         val stringBuilder = new StringBuilder()
         // also make sure to attach the label as a tag so we can keep ground truth next to predictions
-        stringBuilder.append(label + 1).append(" '").append(label + 1).append(" |")
+        stringBuilder.append(target).append(" '").append(target).append(" |")
         features.activeIterator.foreach { case (index, feature) =>
           stringBuilder
               .append(" ")
