@@ -16,12 +16,11 @@ object AmazonReviewsPipeline extends Logging {
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
-    val amazonData = AmazonReviewsDataLoader(sc, conf.dataLocation, conf.threshold).labeledData.repartition(conf.numParts).cache().randomSplit(Array(0.8, 0.2), 1l)
-    val trainData = LabeledData(amazonData(0))
-    val testData = LabeledData(amazonData(1))
+    logInfo("PIPELINE TIMING: Started training the classifier")
+    val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
 
-    val training = trainData.data.cache()
-    val labels = trainData.labels.cache()
+    val training = trainData.data
+    val labels = trainData.labels
 
     // Build the classifier estimator
     logInfo("Training classifier")
@@ -30,24 +29,30 @@ object AmazonReviewsPipeline extends Logging {
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen new Cacher() andThen
-        (LogisticRegressionLBFGSEstimator(1e-3), training, labels) andThen Transformer(_ > 0.5)
+        (LogisticRegressionLBFGSEstimator(1e-3), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
     logInfo("\n" + predictor.toDOTString)
 
-    // Evaluate the classifier
-    logInfo("Evaluating classifier")
+    predictor.apply("Test review")
+    logInfo("PIPELINE TIMING: Finished training the classifier")
 
+    // Evaluate the classifier
+    logInfo("PIPELINE TIMING: Evaluating the classifier")
+
+    val testData = LabeledData(AmazonReviewsDataLoader(sc, conf.testLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
     val testLabels = testData.labels
     val testResults = predictor(testData.data)
-    val eval = BinaryClassifierEvaluator(testResults, testLabels.map(_ > 0))
+    val eval = BinaryClassifierEvaluator(testResults.map(_ > 0), testLabels.map(_ > 0))
 
     logInfo("\n" + eval.summary())
+    logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
 
   case class AmazonReviewsConfig(
-    dataLocation: String = "",
+    trainLocation: String = "",
+    testLocation: String = "",
     threshold: Double = 3.5,
     nGrams: Int = 2,
     commonFeatures: Int = 100000,
@@ -55,7 +60,8 @@ object AmazonReviewsPipeline extends Logging {
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
-    opt[String]("dataLocation") required() action { (x,c) => c.copy(dataLocation=x) }
+    opt[String]("trainLocation") required() action { (x,c) => c.copy(trainLocation=x) }
+    opt[String]("testLocation") required() action { (x,c) => c.copy(testLocation=x) }
     opt[Double]("threshold") action { (x,c) => c.copy(threshold=x)}
     opt[Int]("nGrams") action { (x,c) => c.copy(nGrams=x) }
     opt[Int]("commonFeatures") action { (x,c) => c.copy(commonFeatures=x) }
