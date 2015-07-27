@@ -29,7 +29,7 @@ object AmazonReviewsPipeline extends Logging {
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen new Cacher() andThen
-        (LogisticRegressionLBFGSEstimator(1e-3), training, labels)
+        (LogisticRegressionLBFGSEstimator(convergenceTol = 1e-3), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
