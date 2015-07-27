@@ -9,7 +9,7 @@ import nodes.util.{Cacher, CommonSparseFeatures, MaxClassifier}
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
 import scopt.OptionParser
-import workflow.Optimizer
+import workflow.{Transformer, Optimizer}
 
 object AmazonReviewsPipeline extends Logging {
   val appName = "AmazonReviewsPipeline"
@@ -30,7 +30,7 @@ object AmazonReviewsPipeline extends Logging {
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen new Cacher() andThen
-        (LogisticRegressionSGDEstimator(20, 0.5, 1.0), training, labels)
+        (LogisticRegressionSGDEstimator(20, 0.5, 1.0), training, labels) andThen Transformer(_ > 0.5)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
@@ -41,7 +41,7 @@ object AmazonReviewsPipeline extends Logging {
 
     val testLabels = testData.labels
     val testResults = predictor(testData.data)
-    val eval = BinaryClassifierEvaluator(testResults.map(_ > 0), testLabels.map(_ > 0))
+    val eval = BinaryClassifierEvaluator(testResults, testLabels.map(_ > 0))
 
     logInfo("\n" + eval.summary())
   }
