@@ -22,8 +22,6 @@ object LogRegressionTimitPipeline extends Logging {
     trainLabelsLocation: String = "",
     testDataLocation: String = "",
     testLabelsLocation: String = "",
-    testOutLocation: String = "",
-    trainOutLocation: String = "",
     numParts: Int = 512,
     numCosines: Int = 50,
     gamma: Double = 0.05555,
@@ -99,8 +97,6 @@ object LogRegressionTimitPipeline extends Logging {
     opt[String]("trainLabelsLocation") required() action { (x,c) => c.copy(trainLabelsLocation=x) }
     opt[String]("testDataLocation") required() action { (x,c) => c.copy(testDataLocation=x) }
     opt[String]("testLabelsLocation") required() action { (x,c) => c.copy(testLabelsLocation=x) }
-    opt[String]("trainOutLocation") required() action { (x,c) => c.copy(trainOutLocation=x) }
-    opt[String]("testOutLocation") required() action { (x,c) => c.copy(testOutLocation=x) }
     opt[String]("checkpointDir") action { (x,c) => c.copy(checkpointDir=Some(x)) }
     opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
     opt[Int]("numCosines") action { (x,c) => c.copy(numCosines=x) }
