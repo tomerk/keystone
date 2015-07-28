@@ -114,14 +114,10 @@ object TimitPipeline extends Logging {
 
 
     // Calculate test error
-    blockLinearMapper.applyAndEvaluate(testBatches,
-      (testPredictedValues: RDD[DenseVector[Double]]) => {
-        val predicted = MaxClassifier(testPredictedValues)
-        val evaluator = MulticlassClassifierEvaluator(predicted, actual,
-          TimitFeaturesDataLoader.numClasses)
-        println("TEST Error is " + (100d * evaluator.totalError) + "%")
-      }
-    )
+    val evaluator = MulticlassClassifierEvaluator(MaxClassifier(blockLinearMapper.apply(testBatches)), actual,
+      TimitFeaturesDataLoader.numClasses)
+    logInfo("TEST Error is " + (100d * evaluator.totalError) + "%")
+    logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))
 
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
