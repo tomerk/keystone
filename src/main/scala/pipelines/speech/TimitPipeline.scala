@@ -3,7 +3,6 @@ package pipelines.speech
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
 import breeze.linalg.DenseVector
 import org.apache.commons.math3.random.MersenneTwister
-import pipelines.speech.LogRegressionTimitPipeline._
 import scopt.OptionParser
 
 import org.apache.spark.{SparkConf, SparkContext}
