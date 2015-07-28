@@ -73,7 +73,7 @@ object LogRegressionTimitPipeline extends Logging {
         randomSource.gaussian,
         randomSource.uniform)
     }) andThen
-    (LogisticRegressionLBFGSEstimator(numClasses = TimitFeaturesDataLoader.numClasses), trainData, trainLabels) andThen
+    (LogisticRegressionLBFGSEstimator(numClasses = TimitFeaturesDataLoader.numClasses, numIters = 50), trainData, trainLabels) andThen
     Transformer(_.toInt)
 
     val predictor = Optimizer.execute(predictorPipeline)
