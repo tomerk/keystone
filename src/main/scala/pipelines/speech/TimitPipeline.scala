@@ -3,6 +3,7 @@ package pipelines.speech
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
 import breeze.linalg.DenseVector
 import org.apache.commons.math3.random.MersenneTwister
+import pipelines.speech.LogRegressionTimitPipeline._
 import scopt.OptionParser
 
 import org.apache.spark.{SparkConf, SparkContext}
@@ -34,6 +35,7 @@ object TimitPipeline extends Logging {
     checkpointDir: Option[String] = None)
 
   def run(sc: SparkContext, conf: TimitConfig) {
+    logInfo("PIPELINE TIMING: Started training the classifier")
 
     conf.checkpointDir.foreach(_ => sc.setCheckpointDir(_))
 
@@ -90,6 +92,15 @@ object TimitPipeline extends Logging {
       timitFeaturesData.train.labels
     ).cache().setName("trainLabels")
 
+    // Train the model
+    val blockLinearMapper = new BlockLeastSquaresEstimator(
+      numCosineFeatures, conf.numEpochs, conf.lambda).fit(trainingBatches, labels)
+
+    logInfo("PIPELINE TIMING: Finished training the classifier")
+
+
+    logInfo("PIPELINE TIMING: Evaluating the classifier")
+
     val testData = timitFeaturesData.test.data.cache().setName("testRaw")
     val numTest = testData.count()
 
@@ -100,9 +111,6 @@ object TimitPipeline extends Logging {
 
     val actual = timitFeaturesData.test.labels.cache().setName("actual")
 
-    // Train the model
-    val blockLinearMapper = new BlockLeastSquaresEstimator(
-      numCosineFeatures, conf.numEpochs, conf.lambda).fit(trainingBatches, labels)
 
     // Calculate test error
     blockLinearMapper.applyAndEvaluate(testBatches,
@@ -114,7 +122,7 @@ object TimitPipeline extends Logging {
       }
     )
 
-    System.exit(0)
+    logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
 
   object Distributions extends Enumeration {
