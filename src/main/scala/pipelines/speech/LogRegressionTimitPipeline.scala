@@ -51,7 +51,7 @@ object LogRegressionTimitPipeline extends Logging {
       conf.numParts)
 
     // Build the pipeline
-    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
+    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).cache()
     val trainData = trainDataAndLabels.map(_._2)
     val trainLabels = trainDataAndLabels.map(_._1)
 
@@ -78,7 +78,7 @@ object LogRegressionTimitPipeline extends Logging {
     val predictor = Optimizer.execute(predictorPipeline)
     logInfo("\n" + predictor.toDOTString)
 
-    val testDataAndLabels = timitFeaturesData.test.labels.zip(timitFeaturesData.test.data).repartition(conf.numParts).cache()
+    val testDataAndLabels = timitFeaturesData.test.labels.zip(timitFeaturesData.test.data).cache()
     val testData = testDataAndLabels.map(_._2)
     val testLabels = testDataAndLabels.map(_._1)
 
