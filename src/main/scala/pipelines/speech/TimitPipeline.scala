@@ -16,6 +16,7 @@ import nodes.stats.{CosineRandomFeatures, StandardScaler}
 import nodes.util.{ClassLabelIndicatorsFromIntLabels, MaxClassifier}
 
 import pipelines._
+import workflow.Optimizer
 
 
 object TimitPipeline extends Logging {
@@ -81,7 +82,7 @@ object TimitPipeline extends Logging {
           randomSource.gaussian,
           randomSource.uniform)
       }
-      featurizer.andThen(new StandardScaler(), trainData)
+      Optimizer.execute(featurizer.andThen(new StandardScaler(), trainData))
     }
 
     val trainingBatches = batchFeaturizer.map { x =>
