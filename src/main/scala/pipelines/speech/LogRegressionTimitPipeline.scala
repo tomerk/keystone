@@ -85,6 +85,7 @@ object LogRegressionTimitPipeline extends Logging {
     val evaluator = MulticlassClassifierEvaluator(predictor(testData), testLabels,
       TimitFeaturesDataLoader.numClasses)
     logInfo("TEST Error is " + (100d * evaluator.totalError) + "%")
+    logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))
 
 
   }
