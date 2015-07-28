@@ -5,7 +5,6 @@ import evaluation.MulticlassClassifierEvaluator
 import loaders.TimitFeaturesDataLoader
 import nodes.learning.LogisticRegressionLBFGSEstimator
 import nodes.stats.{CosineRandomFeatures, StandardScaler}
-import nodes.util.Cacher
 import org.apache.commons.math3.random.MersenneTwister
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.{SparkConf, SparkContext}
@@ -73,7 +72,7 @@ object LogRegressionTimitPipeline extends Logging {
         conf.gamma,
         randomSource.gaussian,
         randomSource.uniform)
-    }) andThen new Cacher() andThen
+    }) andThen
     (LogisticRegressionLBFGSEstimator(numClasses = TimitFeaturesDataLoader.numClasses), trainData, trainLabels) andThen
     Transformer(_.toInt)
 
