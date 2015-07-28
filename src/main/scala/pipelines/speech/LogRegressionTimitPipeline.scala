@@ -78,7 +78,11 @@ object LogRegressionTimitPipeline extends Logging {
     val predictor = Optimizer.execute(predictorPipeline)
     logInfo("\n" + predictor.toDOTString)
 
-    val evaluator = MulticlassClassifierEvaluator(predictor(trainData), trainLabels,
+    val testDataAndLabels = timitFeaturesData.test.labels.zip(timitFeaturesData.test.data).repartition(conf.numParts).cache()
+    val testData = testDataAndLabels.map(_._2)
+    val testLabels = testDataAndLabels.map(_._1)
+
+    val evaluator = MulticlassClassifierEvaluator(predictor(testData), testLabels,
       TimitFeaturesDataLoader.numClasses)
     logInfo("TEST Error is " + (100d * evaluator.totalError) + "%")
 
