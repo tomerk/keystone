@@ -31,6 +31,7 @@ object LogRegressionTimitPipeline extends Logging {
     checkpointDir: Option[String] = None)
 
   def run(sc: SparkContext, conf: TimitConfig) {
+    logInfo("PIPELINE TIMING: Started training the classifier")
 
     // Set the constants
     val seed = 123L
@@ -78,6 +79,11 @@ object LogRegressionTimitPipeline extends Logging {
     val predictor = Optimizer.execute(predictorPipeline)
     logInfo("\n" + predictor.toDOTString)
 
+    predictor.apply(trainData.first())
+    logInfo("PIPELINE TIMING: Finished training the classifier")
+
+
+    logInfo("PIPELINE TIMING: Evaluating the classifier")
     val testDataAndLabels = timitFeaturesData.test.labels.zip(timitFeaturesData.test.data).cache()
     val testData = testDataAndLabels.map(_._2)
     val testLabels = testDataAndLabels.map(_._1)
@@ -87,7 +93,7 @@ object LogRegressionTimitPipeline extends Logging {
     logInfo("TEST Error is " + (100d * evaluator.totalError) + "%")
     logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))
 
-
+    logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
 
   object Distributions extends Enumeration {
