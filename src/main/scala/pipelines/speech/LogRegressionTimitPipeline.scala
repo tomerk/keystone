@@ -9,13 +9,12 @@ import org.apache.commons.math3.random.MersenneTwister
 import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
-import pipelines.text.AmazonReviewsPipeline._
 import scopt.OptionParser
 import workflow.{Transformer, Optimizer}
 
 
 object LogRegressionTimitPipeline extends Logging {
-  val appName = "VW Timit Featurization"
+  val appName = "Log Regression TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",
