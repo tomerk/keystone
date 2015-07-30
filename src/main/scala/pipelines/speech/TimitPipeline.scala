@@ -85,7 +85,7 @@ object TimitPipeline extends Logging {
     }
 
     val trainingBatches = batchFeaturizer.map { x =>
-      x.apply(trainData).cache().setName("Training Block")
+      x.apply(trainData)//.cache().setName("Training Block")
     }
 
     val labels = ClassLabelIndicatorsFromIntLabels(TimitFeaturesDataLoader.numClasses).apply(
@@ -106,7 +106,7 @@ object TimitPipeline extends Logging {
 
     val testBatches = batchFeaturizer.map { case x =>
       val rdd = x.apply(testData)
-      rdd.cache().setName("testFeatures")
+      rdd//.cache().setName("testFeatures")
     }
 
     val actual = timitFeaturesData.test.labels.cache().setName("actual")
