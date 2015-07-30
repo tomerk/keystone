@@ -176,8 +176,12 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
     }
 
     val bcd = new BlockCoordinateDescent()
-    val models = bcd.solveLeastSquaresWithL2(
-      A, b, Array(lambda), numIter, new NormalEquations()).transpose
+    val models = if (numIter > 1) {
+      bcd.solveLeastSquaresWithL2(
+        A, b, Array(lambda), numIter, new NormalEquations()).transpose
+    } else {
+      bcd.solveOnePassL2(A.iterator, b, Array(lambda), new NormalEquations()).toSeq.transpose
+    }
     new BlockLinearMapper(models.head, blockSize, Some(labelScaler.mean), Some(featureScalers))
   }
 
