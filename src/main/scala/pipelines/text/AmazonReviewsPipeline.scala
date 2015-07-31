@@ -1,16 +1,41 @@
 package pipelines.text
 
+import breeze.linalg.{SparseVector, Vector}
 import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
 import loaders.{LabeledData, AmazonReviewsDataLoader, NewsgroupsDataLoader}
 import nodes.learning.{LogisticRegressionLBFGSEstimator, LogisticRegressionSGDEstimator, NaiveBayesEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.{Cacher, CommonSparseFeatures, MaxClassifier}
+import org.apache.spark.mllib.feature.HashingTF
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.util.Utils
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
 import scopt.OptionParser
+import utils.MLlibUtils
 import workflow.{Transformer, Optimizer}
 
+import scala.collection.mutable
+
+case class HashingTFNode[T <: Iterable[_]](numFeatures: Int) extends Transformer[T, Vector[Double]] {
+  def nonNegativeMod(x: Int, mod: Int): Int = {
+    val rawMod = x % mod
+    rawMod + (if (rawMod < 0) mod else 0)
+  }
+
+  def indexOf(term: Any): Int = nonNegativeMod(term.##, numFeatures)
+
+  def apply(document: T): Vector[Double] = {
+    val termFrequencies = mutable.HashMap.empty[Int, Double]
+    document.foreach { term =>
+      val i = indexOf(term)
+      termFrequencies.put(i, termFrequencies.getOrElse(i, 0.0) + 1.0)
+    }
+
+    SparseVector(numFeatures)(termFrequencies.toSeq:_*)
+  }
+}
 object AmazonReviewsPipeline extends Logging {
   val appName = "AmazonReviewsPipeline"
 
@@ -22,13 +47,14 @@ object AmazonReviewsPipeline extends Logging {
     val training = trainData.data
     val labels = trainData.labels
 
+    val numFeatures = 33554432;
+
     // Build the classifier estimator
     logInfo("Training classifier")
     val predictorPipeline = Trim andThen LowerCase() andThen
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
-        TermFrequency(x => 1) andThen
-        (CommonSparseFeatures(conf.commonFeatures), training) andThen new Cacher() andThen
+        HashingTFNode(numFeatures) andThen
         (LogisticRegressionLBFGSEstimator(convergenceTol = 1e-3), training, labels)
 
 
@@ -74,7 +100,7 @@ object AmazonReviewsPipeline extends Logging {
    */
   def main(args: Array[String]) = {
     val conf = new SparkConf().setAppName(appName)
-    conf.setIfMissing("spark.master", "local[2]") // This is a fallback if things aren't set via spark submit.
+    conf.setIfMissing("spark.master", "local[8]") // This is a fallback if things aren't set via spark submit.
 
     val sc = new SparkContext(conf)
 
