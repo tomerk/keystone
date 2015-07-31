@@ -18,7 +18,7 @@ import workflow.{Transformer, Optimizer}
 
 import scala.collection.mutable
 
-case class HashingTFNode[T <: Iterable[_]](numFeatures: Int) extends Transformer[T, Vector[Double]] {
+case class HashingTFNode[T <: Seq[Any]](numFeatures: Int) extends Transformer[T, Vector[Double]] {
   def nonNegativeMod(x: Int, mod: Int): Int = {
     val rawMod = x % mod
     rawMod + (if (rawMod < 0) mod else 0)
@@ -28,7 +28,7 @@ case class HashingTFNode[T <: Iterable[_]](numFeatures: Int) extends Transformer
 
   def apply(document: T): Vector[Double] = {
     val termFrequencies = mutable.HashMap.empty[Int, Double]
-    document.foreach { (term: Any) =>
+    document.foreach { term =>
       val i = indexOf(term)
       termFrequencies.put(i, termFrequencies.getOrElse(i, 0.0) + 1.0)
     }
@@ -47,7 +47,7 @@ object AmazonReviewsPipeline extends Logging {
     val training = trainData.data
     val labels = trainData.labels
 
-    val numFeatures = 33554432;
+    val numFeatures = 33554432
 
     // Build the classifier estimator
     logInfo("Training classifier")
