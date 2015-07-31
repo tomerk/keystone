@@ -28,7 +28,7 @@ case class HashingTFNode[T <: Iterable[_]](numFeatures: Int) extends Transformer
 
   def apply(document: T): Vector[Double] = {
     val termFrequencies = mutable.HashMap.empty[Int, Double]
-    document.foreach { term =>
+    document.foreach { (term: Any) =>
       val i = indexOf(term)
       termFrequencies.put(i, termFrequencies.getOrElse(i, 0.0) + 1.0)
     }
