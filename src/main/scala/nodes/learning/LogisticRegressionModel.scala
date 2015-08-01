@@ -61,3 +61,17 @@ case class LogisticRegressionLBFGSEstimator[T <: Vector[Double] : ClassTag](numC
     new LogisticRegressionModel(model)
   }
 }
+
+case class LogisticRegressionLBFGSEstimatorNoScaling[T <: Vector[Double] : ClassTag](numClasses: Int = 2, numIters: Int = 100, convergenceTol: Double = 1E-4)
+    extends LabelEstimator[T, Double, Int] {
+  override def fit(in: RDD[T], labels: RDD[Int]): LogisticRegressionModel[T] = {
+    val labeledPoints = labels.zip(in).map(x => LabeledPoint(x._1, breezeVectorToMLlib(x._2)))
+    val trainer = new utils.LogisticRegressionWithLBFGS().setNumClasses(numClasses)
+    trainer.setValidateData(false).optimizer.setConvergenceTol(convergenceTol).setNumIterations(numIters)
+    val model = trainer.run(labeledPoints)
+
+    new LogisticRegressionModel(model)
+  }
+}
+
+

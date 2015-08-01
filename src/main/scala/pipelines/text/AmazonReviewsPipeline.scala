@@ -3,7 +3,7 @@ package pipelines.text
 import breeze.linalg.{SparseVector, Vector}
 import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
 import loaders.{LabeledData, AmazonReviewsDataLoader, NewsgroupsDataLoader}
-import nodes.learning.{LogisticRegressionLBFGSEstimator, LogisticRegressionSGDEstimator, NaiveBayesEstimator}
+import nodes.learning.{LogisticRegressionLBFGSEstimatorNoScaling, LogisticRegressionLBFGSEstimator, LogisticRegressionSGDEstimator, NaiveBayesEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.{Cacher, CommonSparseFeatures, MaxClassifier}
@@ -55,7 +55,7 @@ object AmazonReviewsPipeline extends Logging {
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
         HashingTFNode(numFeatures) andThen
-        (LogisticRegressionLBFGSEstimator(convergenceTol = 1e-3), training, labels)
+        (LogisticRegressionLBFGSEstimatorNoScaling(convergenceTol = 1e-3), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)

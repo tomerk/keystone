@@ -1,6 +1,13 @@
 package utils
 
 import breeze.linalg.{SparseVector, DenseMatrix, DenseVector}
+import org.apache.spark.annotation.Experimental
+import org.apache.spark.mllib.classification.LogisticRegressionModel
+import org.apache.spark.mllib.linalg.Vector
+import org.apache.spark.mllib.optimization.{SquaredL2Updater, LogisticGradient, LBFGS}
+import org.apache.spark.mllib.regression.{LabeledPoint, GeneralizedLinearAlgorithm}
+import org.apache.spark.mllib.util.DataValidators
+import org.apache.spark.rdd.RDD
 
 /**
  * Provides conversions between MLlib vectors & matrices, and Breeze vectors & matrices
@@ -52,3 +59,50 @@ object MLlibUtils {
   }
 
 }
+
+/**
+ * Train a classification model for Multinomial/Binary Logistic Regression using
+ * Limited-memory BFGS. Standard feature scaling and L2 regularization are used by default.
+ * NOTE: Labels used in Logistic Regression should be {0, 1, ..., k - 1}
+ * for k classes multi-label classification problem.
+ */
+class LogisticRegressionWithLBFGS
+    extends GeneralizedLinearAlgorithm[LogisticRegressionModel] with Serializable {
+
+  override val optimizer = new LBFGS(new LogisticGradient, new SquaredL2Updater)
+
+  override protected val validators = List(multiLabelValidator)
+
+  private def multiLabelValidator: RDD[LabeledPoint] => Boolean = { data =>
+    if (numOfLinearPredictor > 1) {
+      DataValidators.multiLabelValidator(numOfLinearPredictor + 1)(data)
+    } else {
+      DataValidators.binaryLabelValidator(data)
+    }
+  }
+
+  /**
+   * :: Experimental ::
+   * Set the number of possible outcomes for k classes classification problem in
+   * Multinomial Logistic Regression.
+   * By default, it is binary logistic regression so k will be set to 2.
+   */
+  @Experimental
+  def setNumClasses(numClasses: Int): this.type = {
+    require(numClasses > 1)
+    numOfLinearPredictor = numClasses - 1
+    if (numClasses > 2) {
+      optimizer.setGradient(new LogisticGradient(numClasses))
+    }
+    this
+  }
+
+  override protected def createModel(weights: Vector, intercept: Double) = {
+    if (numOfLinearPredictor == 1) {
+      new LogisticRegressionModel(weights, intercept)
+    } else {
+      new LogisticRegressionModel(weights, intercept, numFeatures, numOfLinearPredictor + 1)
+    }
+  }
+}
+
