@@ -47,7 +47,7 @@ object AmazonReviewsPipeline extends Logging {
     val training = trainData.data
     val labels = trainData.labels
 
-    val numFeatures = 33554432
+    val numFeatures = 1048576
 
     // Build the classifier estimator
     logInfo("Training classifier")
