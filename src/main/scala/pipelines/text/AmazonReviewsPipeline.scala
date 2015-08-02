@@ -42,7 +42,7 @@ object AmazonReviewsPipeline extends Logging {
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
     logInfo("PIPELINE TIMING: Started training the classifier")
-    val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
+    val trainData = AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold)//LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
 
     val training = trainData.data
     val labels = trainData.labels
