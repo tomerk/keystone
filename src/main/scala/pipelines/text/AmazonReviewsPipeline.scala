@@ -9,6 +9,7 @@ import nodes.stats.TermFrequency
 import nodes.util.{Cacher, CommonSparseFeatures, MaxClassifier}
 import org.apache.spark.mllib.feature.HashingTF
 import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.util.Utils
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
@@ -99,7 +100,7 @@ object AmazonReviewsPipeline extends Logging {
    * @param args
    */
   def main(args: Array[String]) = {
-    val conf = new SparkConf().setAppName(appName)
+    val conf = new SparkConf().setAppName(appName).set("spark.serializer", "org.apache.spark.serializer.KryoSerializer").registerKryoClasses(Array(classOf[LabeledPoint]))
     conf.setIfMissing("spark.master", "local[8]") // This is a fallback if things aren't set via spark submit.
 
     val sc = new SparkContext(conf)
