@@ -18,24 +18,6 @@ import workflow.{Transformer, Optimizer}
 
 import scala.collection.mutable
 
-case class HashingTFNode[T <: Seq[Any]](numFeatures: Int) extends Transformer[T, SparseVector[Double]] {
-  def nonNegativeMod(x: Int, mod: Int): Int = {
-    val rawMod = x % mod
-    rawMod + (if (rawMod < 0) mod else 0)
-  }
-
-  def indexOf(term: Any): Int = nonNegativeMod(term.##, numFeatures)
-
-  def apply(document: T): SparseVector[Double] = {
-    val termFrequencies = mutable.HashMap.empty[Int, Double]
-    document.foreach { term =>
-      val i = indexOf(term)
-      termFrequencies.put(i, termFrequencies.getOrElse(i, 0.0) + 1.0)
-    }
-
-    SparseVector(numFeatures)(termFrequencies.toSeq:_*)
-  }
-}
 object AmazonReviewsPipeline extends Logging {
   val appName = "AmazonReviewsPipeline"
 
@@ -55,7 +37,7 @@ object AmazonReviewsPipeline extends Logging {
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
         HashingTFNode(numFeatures) andThen
-        (LogisticRegressionLBFGSEstimatorNoScaling(convergenceTol = 1e-3), training, labels)
+        (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
