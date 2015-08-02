@@ -93,27 +93,30 @@ case class NGramsHashingTF(orders: Seq[Int], numFeatures: Int)
     }
 
     var j = 0
-    var order = 0
     val termFrequencies = mutable.HashMap.empty[Int, Double]
     i = 0
-    /*while (i + minOrder <= line.length) {
-      ngramBuf.clear()
+    while (i + minOrder <= line.length) {
+      var order = minOrder
+      var h = seqSeed
 
       j = i
       while (j < i + minOrder) {
-        ngramBuf += line(j)
+        h = mix(h, hashes(j))
         j += 1
       }
-      ngramsBuf += ngramBuf.clone()
+
+      val feature = nonNegativeMod(finalizeHash(h, order), numFeatures)
+      termFrequencies.put(feature, termFrequencies.getOrElse(i, 0.0) + 1.0)
 
       order = minOrder + 1
       while (order <= maxOrder && i + order <= line.length) {
-        ngramBuf += line(i + order - 1)
-        ngramsBuf += ngramBuf.clone()
+        h = mix(h, hashes(i + order - 1))
+        val feature = nonNegativeMod(finalizeHash(h, order), numFeatures)
+        termFrequencies.put(feature, termFrequencies.getOrElse(i, 0.0) + 1.0)
         order += 1
       }
       i += 1
-    }*/
+    }
 
     SparseVector(numFeatures)(termFrequencies.toSeq:_*)
   }

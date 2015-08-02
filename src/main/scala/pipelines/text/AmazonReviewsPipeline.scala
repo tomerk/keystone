@@ -35,8 +35,9 @@ object AmazonReviewsPipeline extends Logging {
     logInfo("Training classifier")
     val predictorPipeline = Trim andThen LowerCase() andThen
         Tokenizer() andThen
-        NGramsFeaturizer(1 to conf.nGrams) andThen
-        HashingTFNode(numFeatures) andThen
+        NGramsHashingTF(1 to conf.nGrams, numFeatures) andThen
+        //NGramsFeaturizer(1 to conf.nGrams) andThen
+        //HashingTFNode(numFeatures) andThen
         (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20), training, labels)
 
 
