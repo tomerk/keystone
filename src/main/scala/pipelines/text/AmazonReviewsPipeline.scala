@@ -38,7 +38,7 @@ object AmazonReviewsPipeline extends Logging {
         NGramsHashingTF(1 to conf.nGrams, numFeatures) andThen
         //NGramsFeaturizer(1 to conf.nGrams) andThen
         //HashingTFNode(numFeatures) andThen
-        (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20), training, labels)
+        (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20, numFeatures = numFeatures), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)

@@ -71,6 +71,11 @@ class LogisticRegressionWithLBFGS
 
   override val optimizer = new LBFGS(new LogisticGradient, new SquaredL2Updater)
 
+  def setNumFeatures(numFeatures: Int): this.type = {
+    this.numFeatures = numFeatures
+    this
+  }
+
   override protected val validators = List(multiLabelValidator)
 
   private def multiLabelValidator: RDD[LabeledPoint] => Boolean = { data =>
