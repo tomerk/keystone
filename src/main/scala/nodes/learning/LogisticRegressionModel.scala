@@ -4,6 +4,7 @@ import breeze.linalg.{DenseMatrix, DenseVector, Vector}
 import org.apache.spark.mllib.classification.{LogisticRegressionModel => MLlibLRM, LogisticRegressionWithLBFGS, LogisticRegressionWithSGD, NaiveBayes}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import utils.MLlibUtils.breezeVectorToMLlib
 import workflow.{Transformer, LabelEstimator}
 
@@ -65,7 +66,7 @@ case class LogisticRegressionLBFGSEstimator[T <: Vector[Double] : ClassTag](numC
 case class LogisticRegressionLBFGSEstimatorNoScaling[T <: Vector[Double] : ClassTag](numClasses: Int = 2, numIters: Int = 100, convergenceTol: Double = 1E-4)
     extends LabelEstimator[T, Double, Int] {
   override def fit(in: RDD[T], labels: RDD[Int]): LogisticRegressionModel[T] = {
-    val labeledPoints = labels.zip(in).map(x => LabeledPoint(x._1, breezeVectorToMLlib(x._2))).cache()
+    val labeledPoints = labels.zip(in).map(x => LabeledPoint(x._1, breezeVectorToMLlib(x._2))).persist(StorageLevel.MEMORY_AND_DISK)
     val trainer = new utils.LogisticRegressionWithLBFGS().setNumClasses(numClasses)
     trainer.setValidateData(false).optimizer.setConvergenceTol(convergenceTol).setNumIterations(numIters)
     val model = trainer.run(labeledPoints)
