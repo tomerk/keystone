@@ -18,7 +18,7 @@ import workflow.{Transformer, Optimizer}
 
 import scala.collection.mutable
 
-case class HashingTFNode[T <: Seq[Any]](numFeatures: Int) extends Transformer[T, Vector[Double]] {
+case class HashingTFNode[T <: Seq[Any]](numFeatures: Int) extends Transformer[T, SparseVector[Double]] {
   def nonNegativeMod(x: Int, mod: Int): Int = {
     val rawMod = x % mod
     rawMod + (if (rawMod < 0) mod else 0)
@@ -26,7 +26,7 @@ case class HashingTFNode[T <: Seq[Any]](numFeatures: Int) extends Transformer[T,
 
   def indexOf(term: Any): Int = nonNegativeMod(term.##, numFeatures)
 
-  def apply(document: T): Vector[Double] = {
+  def apply(document: T): SparseVector[Double] = {
     val termFrequencies = mutable.HashMap.empty[Int, Double]
     document.foreach { term =>
       val i = indexOf(term)
