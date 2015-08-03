@@ -1,24 +1,15 @@
 package pipelines.text
 
-import breeze.linalg.{SparseVector, Vector}
-import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
-import loaders.{LabeledData, AmazonReviewsDataLoader, NewsgroupsDataLoader}
-import nodes.learning.{LogisticRegressionLBFGSEstimatorNoScaling, LogisticRegressionLBFGSEstimator, LogisticRegressionSGDEstimator, NaiveBayesEstimator}
+import evaluation.BinaryClassifierEvaluator
+import loaders.{AmazonReviewsDataLoader, LabeledData}
+import nodes.learning.LogisticRegressionLBFGSEstimatorNoScaling
 import nodes.nlp._
-import nodes.stats.TermFrequency
-import nodes.util.{Cacher, CommonSparseFeatures, MaxClassifier}
-import org.apache.spark.mllib.feature.HashingTF
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.util.Utils
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
 import scopt.OptionParser
-import utils.MLlibUtils
-import workflow.{Transformer, Optimizer}
+import workflow.Optimizer
 
-import scala.collection.mutable
-
-object AmazonReviewsPipeline extends Logging {
+object AmazonReviewsHashingPipeline extends Logging {
   val appName = "AmazonReviewsPipeline"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
@@ -29,14 +20,16 @@ object AmazonReviewsPipeline extends Logging {
     val training = trainData.data
     val labels = trainData.labels
 
+    val numFeatures = 1048576
+
     // Build the classifier estimator
     logInfo("Training classifier")
     val predictorPipeline = Trim andThen LowerCase() andThen
         Tokenizer() andThen
-        NGramsFeaturizer(1 to conf.nGrams) andThen
-        TermFrequency(x => 1) andThen
-        (CommonSparseFeatures(conf.commonFeatures), training) andThen
-        (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20, numFeatures = conf.commonFeatures), training, labels)
+        NGramsHashingTF(1 to conf.nGrams, numFeatures) andThen
+        //NGramsFeaturizer(1 to conf.nGrams) andThen
+        //HashingTFNode(numFeatures) andThen
+        (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20, numFeatures = numFeatures), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
