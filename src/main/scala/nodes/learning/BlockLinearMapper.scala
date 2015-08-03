@@ -104,13 +104,7 @@ class BlockLinearMapper(
   def applyAndEvaluate(
       in: Seq[RDD[DenseVector[Double]]],
       evaluator: (RDD[DenseVector[Double]]) => Unit) {
-    applyAndEvaluate(in.iterator, evaluator)
-  }
-
-  def applyAndEvaluate(
-      in: Iterator[RDD[DenseVector[Double]]],
-      evaluator: (RDD[DenseVector[Double]]) => Unit) {
-    val res = in.zip(xs.zip(featureScalers).iterator).map {
+    val res = in.zip(xs.zip(featureScalers)).map {
       case (rdd, xScaler) => {
         val modelBroadcast = rdd.context.broadcast(xScaler._1)
         xScaler._2(rdd).mapPartitions(rows => {
