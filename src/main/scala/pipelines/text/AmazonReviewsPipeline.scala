@@ -24,7 +24,7 @@ object AmazonReviewsPipeline extends Logging {
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
     logInfo("PIPELINE TIMING: Started training the classifier")
-    val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts))
+    val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
 
     val training = trainData.data
     val labels = trainData.labels
@@ -34,7 +34,7 @@ object AmazonReviewsPipeline extends Logging {
     val predictorPipeline = Trim andThen LowerCase() andThen
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
-        TermFrequency(x => 1) andThen new Cacher() andThen
+        TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen
         (LogisticRegressionLBFGSEstimator(numIters = 20), training, labels)
 
