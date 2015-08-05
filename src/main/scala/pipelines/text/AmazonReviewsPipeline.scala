@@ -34,9 +34,9 @@ object AmazonReviewsPipeline extends Logging {
     val predictorPipeline = Trim andThen LowerCase() andThen
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
-        TermFrequency(x => 1) andThen
+        TermFrequency(x => 1) andThen new Cacher() andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen
-        (LogisticRegressionLBFGSEstimatorNoScaling(numIters = 20, numFeatures = conf.commonFeatures), training, labels)
+        (LogisticRegressionLBFGSEstimator(numIters = 20), training, labels)
 
 
     val predictor = Optimizer.execute(predictorPipeline)
