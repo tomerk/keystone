@@ -101,6 +101,9 @@ object AmazonReviewsVWFeaturizer extends Logging {
    */
   def main(args: Array[String]) = {
     val conf = new SparkConf().setAppName(appName)
+    // NOTE: ONLY APPLICABLE IF YOU CAN DONE COPY-DIR
+    conf.remove("spark.jars")
+
     conf.setIfMissing("spark.master", "local[2]") // This is a fallback if things aren't set via spark submit.
 
     val sc = new SparkContext(conf)

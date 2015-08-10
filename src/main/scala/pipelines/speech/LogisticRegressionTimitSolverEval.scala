@@ -57,6 +57,9 @@ object LogisticRegressionTimitSolverEval extends Logging {
     val appConfig = parse(args)
 
     val conf = new SparkConf().setAppName(appName)
+    // NOTE: ONLY APPLICABLE IF YOU CAN DONE COPY-DIR
+    conf.remove("spark.jars")
+
     conf.setIfMissing("spark.master", "local[2]")
 
     val sc = new SparkContext(conf)
