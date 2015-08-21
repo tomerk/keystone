@@ -27,7 +27,7 @@ case class CommonSparseFeatures[T : ClassTag](numFeatures: Int) extends Estimato
     }
   }
 
-  def merge(a: Array[(T, (Int, Long))], b: Array[(T, (Int, Long))]): Array[(T, (Int, Long))] = ( a ++ b).sorted(ordering).take(numFeatures)
+  def merge(a: Array[(T, (Int, Long))], b: Array[(T, (Int, Long))]): Array[(T, (Int, Long))] = ( a ++ b).sorted(ordering).takeRight(numFeatures)
 
   override def fit(data: RDD[Seq[(T, Double)]]): SparseFeatureVectorizer[T] = {
     val featureOccurrences = data.flatMap(identity).zipWithUniqueId().map(x => (x._1._1, (1, x._2)))
@@ -36,7 +36,7 @@ case class CommonSparseFeatures[T : ClassTag](numFeatures: Int) extends Estimato
     val featureFrequenciesWithUniqueId = featureOccurrences.reduceByKey {
       (x, y) => (x._1 + y._1, Math.min(x._2, y._2))
     }
-    val mostCommonFeatures = featureFrequenciesWithUniqueId.glom().map(_.sorted(ordering).take(numFeatures)).treeReduce(merge).map(_._1)
+    val mostCommonFeatures = featureFrequenciesWithUniqueId.glom().map(_.sorted(ordering).takeRight(numFeatures)).treeReduce(merge).map(_._1)
     val featureSpace = mostCommonFeatures.zipWithIndex.toMap
     new SparseFeatureVectorizer(featureSpace)
   }
