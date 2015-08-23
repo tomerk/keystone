@@ -22,7 +22,6 @@ else
     --driver-library-path $FWDIR/../lib \
     --conf spark.executor.extraLibraryPath=$FWDIR/../lib \
     --conf spark.executor.extraClassPath=$FWDIR/../target/scala-2.10/keystone-assembly-0.1.jar \
-#    --conf spark.locality.wait=5 \
     --driver-memory $KEYSTONE_MEM \
     target/scala-2.10/keystone-assembly-0.1.jar \
     "$@"
