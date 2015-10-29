@@ -88,12 +88,11 @@ evalNewsgroupsPipeline(pipeline, sc, "/Users/tomerk11/Downloads/20news-bydate/20
 import ampcamp._
 import nodes.learning._
 import nodes.util._
-import workflow._
 import breeze.linalg.DenseVector
 
 val (trainData, trainLabels) = loadMnistData(sc, "/Users/tomerk11/Desktop/mnist/train-mnist-dense-with-labels.data")
 
-val featurizer = Transformer[DenseVector[Double], DenseVector[Double]](identity)
+val featurizer = Identity[DenseVector[Double]]()
 //val featurizer = PaddedFFT() andThen LinearRectifier(0.0)
 //val featurizer = RandomSignNode(mnistImageSize) andThen PaddedFFT() andThen LinearRectifier(0.0)
 /*val featurizer = Pipeline.gather {
@@ -103,7 +102,7 @@ val featurizer = Transformer[DenseVector[Double], DenseVector[Double]](identity)
 } andThen VectorCombiner()*/
 
 val pipeline = {
-    featurizer andThen
+    Identity() andThen
     (LinearMapEstimator(lambda = Some(1.0)), trainData, trainLabels) andThen
     MaxClassifier
 }
