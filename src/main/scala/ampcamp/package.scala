@@ -73,11 +73,11 @@ val (trainData, trainLabels) = loadNewsgroupsData(sc, "/Users/tomerk11/Downloads
 val numExamples = trainData.count
 
 val pipeline = {
-    LowerCase() andThen
-    Tokenizer("[\\s]+") andThen
-    TermFrequency(x => x) andThen
-    (IDFCommonSparseFeatures(x => math.log(numExamples/x), 100000), trainData) andThen
-    (LogisticRegressionEstimator(newsgroupsClasses.length, regParam = 0, numIters = 10), trainData, trainLabels)
+  LowerCase() andThen
+  Tokenizer("[\\s]+") andThen
+  TermFrequency(x => x) andThen
+  (IDFCommonSparseFeatures(x => math.log(numExamples/x), 100000), trainData) andThen
+  (LogisticRegressionEstimator(newsgroupsClasses.length, regParam = 0, numIters = 10), trainData, trainLabels)
 }
 
 evalNewsgroupsPipeline(pipeline, sc, "/Users/tomerk11/Downloads/20news-bydate/20news-bydate-test")
@@ -87,25 +87,40 @@ evalNewsgroupsPipeline(pipeline, sc, "/Users/tomerk11/Downloads/20news-bydate/20
 /*
 import ampcamp._
 import nodes.learning._
+import nodes.stats._
 import nodes.util._
 import breeze.linalg.DenseVector
+import workflow._
 
 val (trainData, trainLabels) = loadMnistData(sc, "/Users/tomerk11/Desktop/mnist/train-mnist-dense-with-labels.data")
 
-val featurizer = Identity[DenseVector[Double]]()
-//val featurizer = PaddedFFT() andThen LinearRectifier(0.0)
-//val featurizer = RandomSignNode(mnistImageSize) andThen PaddedFFT() andThen LinearRectifier(0.0)
-/*val featurizer = Pipeline.gather {
-  Seq.fill(conf.numFFTs) {
-    RandomSignNode(mnistImageSize) andThen PaddedFFT() andThen LinearRectifier(0.0)
-  }
-} andThen VectorCombiner()*/
+val pipeline = {
+  Identity() andThen
+  (LinearMapEstimator(lambda = Some(1.0)), trainData, trainLabels) andThen
+  MaxClassifier
+}
 
 val pipeline = {
-    Identity() andThen
-    (LinearMapEstimator(lambda = Some(1.0)), trainData, trainLabels) andThen
-    MaxClassifier
+  RandomSignNode(mnistImageSize) andThen
+  PaddedFFT() andThen
+  LinearRectifier(0.0) andThen
+  (LinearMapEstimator(lambda = Some(1.0)), trainData, trainLabels) andThen
+  MaxClassifier
 }
+
+val pipeline = {
+  Pipeline.gather {
+    Seq.fill(8) {
+      RandomSignNode(mnistImageSize) andThen
+      PaddedFFT() andThen
+      LinearRectifier(0.0)
+    }
+  } andThen
+  VectorCombiner() andThen
+  (LinearMapEstimator(lambda = Some(1.0)), trainData, trainLabels) andThen
+  MaxClassifier
+}
+
 
 evalMnistPipeline(pipeline, sc, "/Users/tomerk11/Desktop/mnist/test-mnist-dense-with-labels.data")
 
