@@ -123,16 +123,22 @@ private[workflow] class ConcretePipeline[A, B](
 
   override def apply(in: RDD[A]): RDD[B] = apply(in, Some(Optimizer))
 
+  private val optimizedPipelines = mutable.Map.empty[RuleExecutor, Pipeline[A, B]]
+
   def apply(in: A, optimizer: Option[RuleExecutor]): B = {
     optimizer match {
-      case Some(opt) => opt.execute(this).apply(in, None)
+      case Some(opt) =>
+        val pipeline = optimizedPipelines.getOrElseUpdate(opt, opt.execute(this))
+        pipeline.apply(in, None)
       case None => singleDataEval(sink, in).asInstanceOf[B]
     }
   }
 
   def apply(in: RDD[A], optimizer: Option[RuleExecutor]): RDD[B] = {
     optimizer match {
-      case Some(opt) => opt.execute(this).apply(in, None)
+      case Some(opt) =>
+        val pipeline = optimizedPipelines.getOrElseUpdate(opt, opt.execute(this))
+        pipeline.apply(in, None)
       case None => rddDataEval(sink, in).asInstanceOf[RDD[B]]
     }
   }
