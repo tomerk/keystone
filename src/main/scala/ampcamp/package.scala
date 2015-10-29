@@ -59,7 +59,7 @@ package object ampcamp {
 }
 
 /*
-./bin/spark-shell --master local[2] --jars /Users/tomerk11/Development/keystone/target/scala-2.10/keystoneml-assembly-0.3.0-SNAPSHOT.jar
+./bin/spark-shell --master local[2] --jars /Users/tomerk11/Development/keystone/target/scala-2.10/keystoneml-assembly-NAPSHOT.jar --driver-java-options "-Xmx2400m" --driver-class-path /Users/tomerk11/Development/keystone/target/scala-2.10/keystoneml-assembly-0.3.0-SNAPSHOT.jar
  */
 
 /*
