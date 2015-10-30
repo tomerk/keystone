@@ -12,9 +12,7 @@ import scala.collection.mutable
  * Created by tomerk11 on 10/28/15.
  */
 package object ampcamp {
-  val numMnistClasses = 10
   val newsgroupsClasses = NewsgroupsDataLoader.classes
-  val mnistImageSize = 784
 
   private val newsgroupsDataMap = mutable.Map.empty[String, LabeledData[Int, String]]
   def loadNewsgroupsData(sc: SparkContext, dataDir: String): (RDD[String], RDD[Int]) = {
@@ -29,12 +27,14 @@ package object ampcamp {
     val testEval = MulticlassClassifierEvaluator(testResults, testLabels, newsgroupsClasses.length)
 
     val fmt = "%2.3f"
-    System.out.println(s"Total Accuracy: ${fmt.format(testEval.totalAccuracy)}")
     System.out.println(testEval.pprintConfusionMatrix(newsgroupsClasses))
+    System.out.println(s"Total Accuracy: ${fmt.format(testEval.totalAccuracy)}")
   }
 
   private val mnistNumPartitions = 10
   private val mnistDataMap = mutable.Map.empty[String, LabeledData[Int, DenseVector[Double]]]
+  val mnistClasses = Array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+
   def loadMnistData(sc: SparkContext, dataDir: String): (RDD[DenseVector[Double]], RDD[DenseVector[Double]]) = {
     val trainLabeledData = mnistDataMap.getOrElseUpdate(dataDir, {
       LabeledData(
@@ -46,15 +46,14 @@ package object ampcamp {
     (trainLabeledData.data, ClassLabelIndicatorsFromIntLabels(mnistClasses.length).apply(trainLabeledData.labels))
   }
 
-  val mnistClasses = Array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
   def evalMnistPipeline(pipeline: Pipeline[DenseVector[Double], Int], sc: SparkContext, dataDir: String): Unit = {
     val (testData, testLabels) = loadMnistData(sc, dataDir)
     val testResults = pipeline(testData)
     val testEval = MulticlassClassifierEvaluator(testResults, MaxClassifier(testLabels), mnistClasses.length)
 
     val fmt = "%2.3f"
-    System.out.println(s"Total Accuracy: ${fmt.format(testEval.totalAccuracy)}")
     System.out.println(testEval.pprintConfusionMatrix(mnistClasses))
+    System.out.println(s"Total Accuracy: ${fmt.format(testEval.totalAccuracy)}")
   }
 }
 
@@ -71,6 +70,21 @@ import nodes.stats._
 val (trainData, trainLabels) = loadNewsgroupsData(sc, "/Users/tomerk11/Downloads/20news-bydate/20news-bydate-train")
 
 val numExamples = trainData.count
+
+val pipeline = {
+  Tokenizer("[\\s]+") andThen
+  TermFrequency(x => 1) andThen
+  (CommonSparseFeatures(100000), trainData) andThen
+  (LogisticRegressionEstimator(newsgroupsClasses.length, regParam = 0, numIters = 10), trainData, trainLabels)
+}
+
+val pipeline = {
+  LowerCase() andThen
+  Tokenizer("[\\s]+") andThen
+  TermFrequency(x => 1) andThen
+  (CommonSparseFeatures(100000), trainData) andThen
+  (LogisticRegressionEstimator(newsgroupsClasses.length, regParam = 0, numIters = 10), trainData, trainLabels)
+}
 
 val pipeline = {
   LowerCase() andThen
@@ -93,6 +107,8 @@ import breeze.linalg.DenseVector
 import workflow._
 
 val (trainData, trainLabels) = loadMnistData(sc, "/Users/tomerk11/Desktop/mnist/train-mnist-dense-with-labels.data")
+
+val mnistImageSize = 784
 
 val pipeline = {
   Identity() andThen
