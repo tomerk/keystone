@@ -17,8 +17,6 @@ scalaVersion := "2.10.4"
 parallelExecution in Test := false
 
 libraryDependencies ++= Seq(
-  "edu.arizona.sista" % "processors" % "3.0" exclude("ch.qos.logback", "logback-classic"),
-  "edu.arizona.sista" % "processors" % "3.0" classifier "models",
   "org.slf4j" % "slf4j-api" % "1.7.2",
   "org.slf4j" % "slf4j-log4j12" % "1.7.2",
   "org.scalatest" %% "scalatest" % "1.9.1" % "test",
