@@ -18,7 +18,7 @@ object MatrixUtils extends Serializable {
    * @param mat Input matrix.
    * @return Array of rows.
    */
-  def matrixToRowArray[T](mat: DenseMatrix[T]): Array[DenseVector[T]] = {
+  def matrixToRowArray[T : ClassTag](mat: DenseMatrix[T]): Array[DenseVector[T]] = {
     val matT = mat.t
     (0 until mat.rows).toArray.map(x => DenseVector(matT(::, x).toArray))
   }
