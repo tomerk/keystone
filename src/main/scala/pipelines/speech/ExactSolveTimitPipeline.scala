@@ -72,7 +72,7 @@ object ExactSolveTimitPipeline extends Logging {
         randomSource.uniform)
     }
 
-    val featurizedTrainData = featurizer(trainData).cache().setName("Featurized Train Data")
+    val featurizedTrainData = featurizer(trainData).map(_.copy).cache().setName("Featurized Train Data")
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()

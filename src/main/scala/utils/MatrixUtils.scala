@@ -20,7 +20,7 @@ object MatrixUtils extends Serializable {
    */
   def matrixToRowArray[T](mat: DenseMatrix[T]): Array[DenseVector[T]] = {
     val matT = mat.t
-    (0 until mat.rows).toArray.map(matT(::, _).toDenseVector)
+    (0 until mat.rows).toArray.map(matT(::, _))
   }
 
   /**
