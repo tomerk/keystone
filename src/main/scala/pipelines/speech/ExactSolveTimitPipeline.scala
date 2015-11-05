@@ -78,6 +78,7 @@ object ExactSolveTimitPipeline extends Logging {
 
     logInfo(s"PIPELINE TIMING: Dim size should be ${numCosineBatches * numCosineFeatures} ms")
     logInfo(s"PIPELINE TIMING: Dim size is ${featurizedTrainData.first().length} ms")
+    logInfo(s"PIPELINE TIMING: Dim size is ${featurizedTrainData.first().data.length} ms")
 
     val solveStartTime = System.currentTimeMillis()
     val model = new LinearMapEstimator().fit(featurizedTrainData, trainLabels) andThen
