@@ -56,7 +56,7 @@ object AmazonBlockSolvePipeline extends Logging {
     testLocation: String = "",
     threshold: Double = 3.5,
     nGrams: Int = 2,
-    numEpochs: Int = 5,
+    numEpochs: Int = 3,
     commonFeatures: Int = 100000,
     blockSize: Int = 1024,
     numParts: Int = 512)

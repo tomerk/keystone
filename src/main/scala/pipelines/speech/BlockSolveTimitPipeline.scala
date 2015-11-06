@@ -25,7 +25,7 @@ object BlockSolveTimitPipeline extends Logging {
     gamma: Double = 0.05555,
     rfType: Distributions.Value = Distributions.Gaussian,
     lambda: Double = 0.0,
-    numEpochs: Int = 5,
+    numEpochs: Int = 3,
     checkpointDir: Option[String] = None)
 
   def run(sc: SparkContext, conf: TimitConfig) {
