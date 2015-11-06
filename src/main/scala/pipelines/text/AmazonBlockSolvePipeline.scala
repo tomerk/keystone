@@ -58,7 +58,7 @@ object AmazonBlockSolvePipeline extends Logging {
     nGrams: Int = 2,
     numEpochs: Int = 5,
     commonFeatures: Int = 100000,
-    blockSize: Int = 2000,
+    blockSize: Int = 1024,
     numParts: Int = 512)
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
