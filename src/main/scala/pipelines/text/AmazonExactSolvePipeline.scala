@@ -28,14 +28,13 @@ object AmazonExactSolvePipeline extends Logging {
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
-        (CommonSparseFeatures(conf.commonFeatures), training) andThen
-        Transformer(_.toDenseVector)
+        (CommonSparseFeatures(conf.commonFeatures), training)
 
     val featurizedTrainData = featurizer.apply(training).cache()
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new LinearMapEstimator().fit(featurizedTrainData, labels) andThen
+    val model = new LinearMapEstimator().fit(featurizedTrainData.map(_.toDenseVector), labels) andThen
         MaxClassifier
     val solveEndTime  = System.currentTimeMillis()
 
@@ -44,7 +43,7 @@ object AmazonExactSolvePipeline extends Logging {
     // Evaluate the classifier
     logInfo("PIPELINE TIMING: Evaluating the classifier")
 
-    val trainResults = model(featurizedTrainData)
+    val trainResults = model(featurizedTrainData.map(_.toDenseVector))
     val eval = BinaryClassifierEvaluator(trainResults.map(_ > 0), trainData.labels.map(_ > 0))
 
     logInfo("\n" + eval.summary())

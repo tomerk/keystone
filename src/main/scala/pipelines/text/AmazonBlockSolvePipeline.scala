@@ -28,19 +28,15 @@ object AmazonBlockSolvePipeline extends Logging {
         Tokenizer() andThen
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
-        (CommonSparseFeatures(conf.commonFeatures), training) andThen
-        Transformer(_.toDenseVector)
+        (CommonSparseFeatures(conf.commonFeatures), training)
 
     val featurizedTrainData = featurizer.apply(training).cache()
     featurizedTrainData.count()
 
-    val splitFeaturizedTrainData = new VectorSplitter(conf.blockSize, Some(conf.commonFeatures)).apply(featurizedTrainData).map(_.cache())
-    splitFeaturizedTrainData.foreach(_.count())
-
-    featurizedTrainData.unpersist(true)
+    val splitFeaturizedTrainData = new VectorSplitter(conf.blockSize, Some(conf.commonFeatures)).apply(featurizedTrainData.map(_.toDenseVector))
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new BlockLeastSquaresEstimator(conf.blockSize, numIter = conf.numEpochs).fit(featurizedTrainData, labels)
+    val model = new BlockLeastSquaresEstimator(conf.blockSize, numIter = conf.numEpochs).fit(splitFeaturizedTrainData, labels)
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
