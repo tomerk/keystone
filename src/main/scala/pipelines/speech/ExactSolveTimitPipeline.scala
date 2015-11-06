@@ -14,7 +14,7 @@ import workflow.{Optimizer, Transformer}
 
 
 object ExactSolveTimitPipeline extends Logging {
-  val appName = "Log Regression TIMIT Pipeline"
+  val appName = "Exact Solve TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",
@@ -50,7 +50,7 @@ object ExactSolveTimitPipeline extends Logging {
       conf.numParts)
 
     // Build the pipeline
-    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).cache()
+    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
     val trainLabels = ClassLabelIndicatorsFromIntLabels(TimitFeaturesDataLoader.numClasses).apply(trainDataAndLabels.map(_._1))
 

@@ -13,7 +13,7 @@ import workflow.Transformer
 
 
 object LBFGSSolveTimitPipeline extends Logging {
-  val appName = "Log Regression TIMIT Pipeline"
+  val appName = "LBFGS Solve TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",
@@ -49,7 +49,7 @@ object LBFGSSolveTimitPipeline extends Logging {
       conf.numParts)
 
     // Build the pipeline
-    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).cache()
+    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
     val trainLabels = trainDataAndLabels.map(_._1)
 

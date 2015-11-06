@@ -13,7 +13,7 @@ import scopt.OptionParser
 
 
 object BlockSolveTimitPipeline extends Logging {
-  val appName = "Timit"
+  val appName = "Block Solve TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",
@@ -53,7 +53,7 @@ object BlockSolveTimitPipeline extends Logging {
       conf.numParts)
 
     // Build the pipeline
-    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).cache()
+    val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
     val trainLabels = ClassLabelIndicatorsFromIntLabels(TimitFeaturesDataLoader.numClasses).apply(trainDataAndLabels.map(_._1))
 
