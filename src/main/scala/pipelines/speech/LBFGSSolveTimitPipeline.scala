@@ -75,7 +75,7 @@ object LBFGSSolveTimitPipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = LogisticRegressionLBFGSEstimator(numClasses = TimitFeaturesDataLoader.numClasses, numIters = 50, cache = false).fit(featurizedTrainData, trainLabels) andThen
+    val model = LogisticRegressionLBFGSEstimator(numClasses = TimitFeaturesDataLoader.numClasses, numIters = 20, cache = false).fit(featurizedTrainData, trainLabels) andThen
         Transformer(_.toInt)
     val solveEndTime  = System.currentTimeMillis()
 
