@@ -107,7 +107,7 @@ class SparseVectorSplitter(
     (0 until numBlocks).map { blockNum =>
       in.map { vec =>
         // Expliclity call toArray as breeze's slice is lazy
-        DenseVector(vec(blockNum * blockSize to (blockNum + 1) * blockSize).toArray)
+        DenseVector(vec(blockNum * blockSize until (blockNum + 1) * blockSize).toArray)
       }
     }
   }
