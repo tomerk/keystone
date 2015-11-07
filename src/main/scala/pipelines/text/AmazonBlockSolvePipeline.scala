@@ -1,13 +1,15 @@
 package pipelines.text
 
+import breeze.linalg.{SparseVector, DenseVector}
 import evaluation.BinaryClassifierEvaluator
 import loaders.{AmazonReviewsDataLoader, LabeledData}
 import nodes.learning.{BlockLeastSquaresEstimator, LinearMapEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.{VectorSplitter, ClassLabelIndicatorsFromIntLabels, CommonSparseFeatures, MaxClassifier}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
-import pipelines.Logging
+import pipelines.{FunctionNode, Logging}
 import scopt.OptionParser
 import workflow.{Optimizer, Transformer}
 
@@ -33,7 +35,7 @@ object AmazonBlockSolvePipeline extends Logging {
     val featurizedTrainData = featurizer.apply(training).cache()
     featurizedTrainData.count()
 
-    val splitFeaturizedTrainData = new VectorSplitter(conf.blockSize, Some(conf.commonFeatures)).apply(featurizedTrainData.map(_.toDenseVector))
+    val splitFeaturizedTrainData = new SparseVectorSplitter(conf.blockSize, Some(conf.commonFeatures)).apply(featurizedTrainData)
 
     val solveStartTime = System.currentTimeMillis()
     val model = new BlockLeastSquaresEstimator(conf.blockSize, numIter = conf.numEpochs).fit(splitFeaturizedTrainData, labels)
@@ -92,4 +94,21 @@ object AmazonBlockSolvePipeline extends Logging {
     sc.stop()
   }
 
+}
+
+class SparseVectorSplitter(
+    blockSize: Int,
+    numFeaturesOpt: Option[Int] = None)
+    extends FunctionNode[RDD[SparseVector[Double]], Seq[RDD[DenseVector[Double]]]] {
+
+  override def apply(in: RDD[SparseVector[Double]]): Seq[RDD[DenseVector[Double]]] = {
+    val numFeatures = numFeaturesOpt.getOrElse(in.first.length)
+    val numBlocks = math.ceil(numFeatures.toDouble / blockSize).toInt
+    (0 until numBlocks).map { blockNum =>
+      in.map { vec =>
+        // Expliclity call toArray as breeze's slice is lazy
+        DenseVector(vec(blockNum * blockSize to (blockNum + 1) * blockSize).toArray)
+      }
+    }
+  }
 }
