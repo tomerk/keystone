@@ -125,7 +125,7 @@ object TruncatedSVD extends Logging {
       //Chunk up the parts.
       val parts = (0 until cols by colsPerPartition).map(s => (s, lmat(::, s until min(s + colsPerPartition, cols))))
 
-      parts.map { case (colGroup, lm) => (colGroup, (part, lm))}.toIterator
+      parts.map { case (colGroup, lm) => (colGroup, (part, lm.copy))}.toIterator
     }
     }.groupByKey().map { case (id,block) => {
       //groupByKey, sortBy rowStart, and horzcat.
