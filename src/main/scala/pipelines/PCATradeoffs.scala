@@ -3,6 +3,7 @@ package pipelines
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats._
+import edu.berkeley.cs.amplab.mlmatrix.{TruncatedSVD, TSQR, RowPartitionedMatrix}
 import edu.berkeley.cs.amplab.mlmatrix.util.QRUtils
 import nodes.images.Convolver
 import nodes.learning.PCAEstimator
@@ -68,63 +69,112 @@ object PCATradeoffs extends Logging {
   }
 
   def fro(x: DenseMatrix[Double]): Double = math.sqrt(x.values.map(x => x*x).sum)
-  def approxError(vapprox: Double, v: Double): Double = math.abs(1.0 - vapprox/v)
+  def approxError(vapprox: DenseMatrix[Double], v: DenseMatrix[Double]) = sum(abs(1.0 - (vapprox / v)))/(v.rows*v.cols)
 
-
-  def run(ns: Array[Int], ds: Array[Int], ks: Array[Double], qs: Array[Int], ps: Array[Int], trials: Int) = {
-
+  def run(sc: SparkContext, conf: PCATradeoffConfig) = {
+    if (conf.local) {
     //First run the approximate things.
-    for (
-      n <- ns;
-      d <- ds;
-      k <- ks;
-      q <- qs;
-      p <- ps;
-      t <- 1 to trials
-    ) {
-      //Generate the data
-      val data = DenseMatrix.rand[Double](n, d)
+      for (
+        n <- conf.ns;
+        d <- conf.ds;
+        k <- conf.ks;
+        q <- conf.qs;
+        p <- conf.ps;
+        t <- 1 to conf.trials
+      ) {
+        //Generate the data
+        val data = DenseMatrix.rand[Double](n, d)
 
-      //Get a PCA object
-      val dims = math.ceil(k*d).toInt
-      val pca = new PCAEstimator(dims)
-      val (p1, timing) = time(pca.computePCAd(data, dims))
-      logInfo(s"svdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0")
+        //Get a PCA object
+        val dims = math.ceil(k * d).toInt
+        val pca = new PCAEstimator(dims)
+        val (p1, timing) = time(pca.computePCAd(data, dims))
+        logInfo(s"svdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
 
-      //Do the approximate PCA
+        //Do the approximate PCA
 
-      val (p2, timing2) = time(approximatePCA(data, dims, q, p))
-      val absdiff = abs(p1)-abs(p2)
+        val (p2, timing2) = time(approximatePCA(data, dims, q, p))
+        val absdiff = abs(p1) - abs(p2)
 
-      logInfo(s"approxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff)/(d * dims)}")
+        logInfo(s"approxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
 
-      logDebug(s"p1 ${shape(p1)}: $p1")
-      logDebug(s"p2 ${shape(p2)}: $p2")
+        logDebug(s"p1 ${shape(p1)}: $p1")
+        logDebug(s"p2 ${shape(p2)}: $p2")
 
 
-      logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
+        logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
+      }
+
+    } else {
+      for (
+        n <- conf.ns;
+        d <- conf.ds;
+        k <- conf.ks;
+        q <- conf.qs;
+        p <- conf.ps;
+        t <- 1 to conf.trials
+      ) {
+        val dims = math.ceil(k * d).toInt
+
+        val mat = RowPartitionedMatrix.createRandom(sc, n, d, conf.numParts, true)
+        mat.rdd.count()
+
+        //Get a PCA object
+        val (p1, timing) = time {
+          val rPart = new TSQR().qrR(mat)
+          val qrDone = System.nanoTime()
+
+          val asvd = svd(rPart)
+
+          asvd.Vt(0 until dims, ::).t
+        }
+        logInfo(s"distsvdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
+
+        //Do the approximate PCA
+        val (p2, timing2) = time {
+          val res = new TruncatedSVD().computePartial(mat, dims, q)
+
+          val topres = res._2.t
+          topres
+        }
+
+        val absdiff = abs(p1) - abs(p2)
+
+        logInfo(s"distapproxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
+
+        logDebug(s"p1 ${shape(p1)}: $p1")
+        logDebug(s"p2 ${shape(p2)}: $p2")
+
+
+        logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
+
+      }
 
     }
   }
 
   //Command line arguments. sizes, channels, num filters, filter size range. separable/not.
   case class PCATradeoffConfig(
+      local: Boolean = true,
       ns: Array[Int] = Array(1e4, 1e5, 1e6).map(_.toInt),
-      ds: Array[Int] = Array(1e2, 1e3, 1e4).map(_.toInt),
+      ds: Array[Int] = Array(256, 1024, 4096, 8192).map(_.toInt),
       ks: Array[Double] = Array(1e-3, 1e-2, 1e-1, 0.5, 1.0),
       qs: Array[Int] = Array(50),
       ps: Array[Int] = Array(5),
+      numParts: Int = 256,
       trials: Int = 1)
 
   def parse(args: Array[String]): PCATradeoffConfig = new OptionParser[PCATradeoffConfig](appName) {
     head(appName, "0.1")
     help("help") text("prints this usage text")
+    opt[Boolean]("local") action { (x,c) => c.copy(local=x) }
     opt[String]("ns") action { (x,c) => c.copy(ns=x.split(",").map(_.toInt).toArray) } text("size of dataset")
     opt[String]("ds") action { (x,c) => c.copy(ds=x.split(",").map(_.toInt).toArray) } text("number of dimensions")
     opt[String]("ks") action { (x,c) => c.copy(ks=x.split(",").map(_.toDouble).toArray) } text("how many components to recover")
     opt[String]("qs") action { (x,c) => c.copy(qs=x.split(",").map(_.toInt).toArray) } text("how many iterations of approximate to run")
     opt[String]("ps") action { (x,c) => c.copy(ps=x.split(",").map(_.toInt).toArray) } text("how much padding to use")
     opt[Int]("trials") action { (x,c) => c.copy(trials=x) } text("how many trials to run")
+    opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
   }.parse(args, PCATradeoffConfig()).get
 
   /**
@@ -132,7 +182,14 @@ object PCATradeoffs extends Logging {
    * @param args
    */
   def main(args: Array[String]) = {
-    val conf = parse(args)
-    run(conf.ns, conf.ds, conf.ks, conf.qs, conf.ps, conf.trials)
+    val appConfig = parse(args)
+
+    val conf = new SparkConf().setAppName(appName)
+    conf.setIfMissing("spark.master", "local[2]")
+
+    val sc = new SparkContext(conf)
+    run(sc, appConfig)
+
+    sc.stop()
   }
 }
