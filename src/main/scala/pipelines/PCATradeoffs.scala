@@ -73,7 +73,17 @@ object PCATradeoffs extends Logging {
 
   def run(sc: SparkContext, conf: PCATradeoffConfig) = {
     if (conf.local) {
-    //First run the approximate things.
+      // Run a small PCA just to init everything:
+      {
+        val data = DenseMatrix.rand[Double](10000, 256)
+
+        //Get a PCA object
+        val dims = 1
+        val pca = new PCAEstimator(dims)
+        val (p1, timing) = time(pca.computePCAd(data, dims))
+      }
+
+      //First run the approximate things.
       for (
         n <- conf.ns;
         d <- conf.ds;
@@ -157,8 +167,8 @@ object PCATradeoffs extends Logging {
   case class PCATradeoffConfig(
       local: Boolean = true,
       ns: Array[Int] = Array(1e4, 1e5, 1e6).map(_.toInt),
-      ds: Array[Int] = Array(256, 1024, 4096, 8192).map(_.toInt),
-      ks: Array[Double] = Array(1e-3, 1e-2, 1e-1, 0.5, 1.0),
+      ds: Array[Int] = Array(256, 512, 1024, 2048, 4096),
+      ks: Array[Double] = Array(1.0/256.0, 1.0/16.0, 1.0/4.0, 1.0/2.0, 1.0),
       qs: Array[Int] = Array(50),
       ps: Array[Int] = Array(5),
       numParts: Int = 256,
@@ -184,10 +194,15 @@ object PCATradeoffs extends Logging {
   def main(args: Array[String]) = {
     val appConfig = parse(args)
 
-    val conf = new SparkConf().setAppName(appName)
-    conf.setIfMissing("spark.master", "local[2]")
+    val sc = if (appConfig.local) {
+      null
+    } else {
+      val conf = new SparkConf().setAppName(appName)
+      conf.setIfMissing("spark.master", "local[2]")
 
-    val sc = new SparkContext(conf)
+      new SparkContext(conf)
+    }
+
     run(sc, appConfig)
 
     sc.stop()
