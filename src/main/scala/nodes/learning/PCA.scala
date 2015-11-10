@@ -61,7 +61,7 @@ class PCAEstimator(dims: Int) extends Estimator[DenseVector[Float], DenseVector[
   }
 
   def computePCA(dataMat: DenseMatrix[Float], dims: Int): DenseMatrix[Float] = {
-    logInfo(s"Size of dataMat: (${dataMat.rows}, ${dataMat.cols})")
+    logDebug(s"Size of dataMat: (${dataMat.rows}, ${dataMat.cols})")
 
     val means = (mean(dataMat(::, *))).toDenseVector
 
@@ -97,6 +97,51 @@ class PCAEstimator(dims: Int) extends Estimator[DenseVector[Float], DenseVector[
     val absColMaxs = max(absPCA(::, *)).toArray
     val signs = colMaxs.zip(absColMaxs).map { x =>
       if (x._1 == x._2) 1.0f else -1.0f
+    }
+
+    pca(*, ::) :*= new DenseVector(signs)
+
+    // Return a subset of the columns.
+    pca(::, 0 until dims)
+  }
+
+  def computePCAd(dataMat: DenseMatrix[Double], dims: Int): DenseMatrix[Double] = {
+    logDebug(s"Size of dataMat: (${dataMat.rows}, ${dataMat.cols})")
+
+    val means = (mean(dataMat(::, *))).toDenseVector
+
+    val data = dataMat(*, ::) - means
+
+    val rows = dataMat.rows
+    val cols = dataMat.cols
+
+    val s1 = DenseVector.zeros[Double](math.min(data.rows, data.cols))
+    val v1 = DenseMatrix.zeros[Double](data.cols, data.cols)
+
+    // Get optimal workspace size
+    // we do this by sending -1 as lwork to the lapack function
+    val scratch, work = new Array[Double](1)
+    val info = new intW(0)
+
+    lapack.dgesvd("N", "A", rows, cols, scratch, rows, scratch, null, 1, scratch, cols, work, -1, info)
+
+    val lwork1 = work(0).toInt
+    val workspace = new Array[Double](lwork1)
+
+    // Perform the SVD with sgesvd
+    lapack.dgesvd("N", "A", rows, cols, data.toArray, rows, s1.data, null, 1, v1.data, cols, workspace, workspace.length, info)
+
+    val pca = v1.t
+
+    // Mimic matlab
+    // Enforce a sign convention on the coefficients -- the largest element in
+    // each column will have a positive sign.
+
+    val colMaxs = max(pca(::, *)).toArray
+    val absPCA = abs(pca)
+    val absColMaxs = max(absPCA(::, *)).toArray
+    val signs = colMaxs.zip(absColMaxs).map { x =>
+      if (x._1 == x._2) 1.0 else -1.0
     }
 
     pca(*, ::) :*= new DenseVector(signs)
