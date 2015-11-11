@@ -135,6 +135,12 @@ object PCATradeoffs extends Logging {
         val mat = RowPartitionedMatrix.createRandom(sc, n, d, conf.numParts, true)
         mat.rdd.count()
 
+        val (colMat, rowToColTime) = time {
+          val col = TruncatedSVD.rowToColumnPartitionedMatrix(mat)
+          col.rdd.cache().count()
+          col
+        }
+
         //Get a PCA object
         val (asvd, timing) = time {
           val rPart = new TSQR().qrR(mat)
@@ -152,11 +158,11 @@ object PCATradeoffs extends Logging {
           val dims = math.ceil(k * d).toInt
 
           val p1 = asvd.Vt(0 until dims, ::).t
-          logInfo(s"distsvdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
+          logInfo(s"distsvdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0,0.0")
 
           //Do the approximate PCA
           val (p2, timing2) = time {
-            val res = new TruncatedSVD().computePartial(mat, dims, q)
+            val res = new TruncatedSVD().computePartial(mat, colMat, dims, q)
 
             val topres = res._2.t
             topres
@@ -164,7 +170,7 @@ object PCATradeoffs extends Logging {
 
           val absdiff = abs(p1) - abs(p2)
 
-          logInfo(s"distapproxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
+          logInfo(s"distapproxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)},$rowToColTime")
 
           logDebug(s"p1 ${shape(p1)}: $p1")
           logDebug(s"p2 ${shape(p2)}: $p2")

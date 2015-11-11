@@ -82,6 +82,38 @@ class TruncatedSVD extends Logging with Serializable {
     (ubsv.S, ubsv.Vt(0 until k, ::))
   }
 
+  def computePartial(A: RowPartitionedMatrix, colA: ColumnPartitionedMatrix, k: Int, q: Int):
+  (DenseVector[Double], DenseMatrix[Double]) = {
+    val n = A.numRows
+    val d = A.numCols.toInt
+    
+    val l = k + 5
+
+    //Omega is a gaussian - this is maybe not worth doing distributed.
+    val Omega = TruncatedSVD.drawGaussian(A.rdd.context, d, l, A.rdd.partitions.length).collect
+
+    val Y = TruncatedSVD.times(A, Omega).collect
+
+    var Q = QRUtils.qrQR(Y)._1
+
+    var i = 0
+    while (i < q) {
+      val YHat = TruncatedSVD.times(Q.t, colA).collect
+      val Qh = QRUtils.qrQR(YHat.t)._1
+
+      val Yj = TruncatedSVD.times(A, Qh).collect
+      Q = QRUtils.qrQR(Yj)._1
+
+      i+=1
+    }
+
+    val B = TruncatedSVD.times(Q.t, colA).collect
+    val ubsv = svd.reduced(B)
+
+    (ubsv.S, ubsv.Vt(0 until k, ::))
+  }
+
+
 }
 
 object TruncatedSVD extends Logging {
