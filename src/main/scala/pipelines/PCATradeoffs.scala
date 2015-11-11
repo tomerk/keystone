@@ -10,6 +10,7 @@ import nodes.learning.PCAEstimator
 import org.apache.spark.{SparkContext, SparkConf}
 import scopt.OptionParser
 import utils.{ImageUtils, ImageMetadata, RowMajorArrayVectorizedImage, Image}
+import edu.berkeley.cs.amplab.mlmatrix.util.QRUtils
 
 object PCATradeoffs extends Logging {
   val appName = "PCATradeoffs"
@@ -27,9 +28,7 @@ object PCATradeoffs extends Logging {
     //This algorithm corresponds to Algorithms 4.4 and 5.1 of Halko, Martinsson, and Tropp, 2011.
     //According to sections 9.3 and  9.4 of the same, Ming Gu argues for exponentially fast convergence.
 
-    val means = (mean(data(::, *))).toDenseVector
-
-    val A = data(*, ::) - means
+    val A = data
     val d = A.cols
 
     val l = k + p
@@ -86,78 +85,93 @@ object PCATradeoffs extends Logging {
       //First run the approximate things.
       for (
         n <- conf.ns;
-        d <- conf.ds;
-        k <- conf.ks;
-        q <- conf.qs;
-        p <- conf.ps;
-        t <- 1 to conf.trials
+        d <- conf.ds
       ) {
         //Generate the data
         val data = DenseMatrix.rand[Double](n, d)
 
         //Get a PCA object
-        val dims = math.ceil(k * d).toInt
-        val pca = new PCAEstimator(dims)
-        val (p1, timing) = time(pca.computePCAd(data, dims))
-        logInfo(s"svdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
+        val (asvd, timing) = time {
+          val rPart = QRUtils.qrR(data)
+          val asvd = svd(rPart)
 
-        //Do the approximate PCA
+          asvd
+        }
 
-        val (p2, timing2) = time(approximatePCA(data, dims, q, p))
-        val absdiff = abs(p1) - abs(p2)
+        for (
+          k <- conf.ks;
+          q <- conf.qs;
+          p <- conf.ps;
+          t <- 1 to conf.trials
+        ) {
 
-        logInfo(s"approxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
+          //Get a PCA object
+          val dims = math.ceil(k * d).toInt
+          val p1 = asvd.Vt(0 until dims, ::).t
 
-        logDebug(s"p1 ${shape(p1)}: $p1")
-        logDebug(s"p2 ${shape(p2)}: $p2")
+          logInfo(s"svdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
+
+          //Do the approximate PCA
+
+          val (p2, timing2) = time(approximatePCA(data, dims, q, p))
+          val absdiff = abs(p1) - abs(p2)
+
+          logInfo(s"approxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
+
+          logDebug(s"p1 ${shape(p1)}: $p1")
+          logDebug(s"p2 ${shape(p2)}: $p2")
 
 
-        logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
+          logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
+        }
       }
 
     } else {
       for (
         n <- conf.ns;
-        d <- conf.ds;
-        k <- conf.ks;
-        q <- conf.qs;
-        p <- conf.ps;
-        t <- 1 to conf.trials
+        d <- conf.ds
       ) {
-        val dims = math.ceil(k * d).toInt
 
         val mat = RowPartitionedMatrix.createRandom(sc, n, d, conf.numParts, true)
         mat.rdd.count()
 
         //Get a PCA object
-        val (p1, timing) = time {
+        val (asvd, timing) = time {
           val rPart = new TSQR().qrR(mat)
-          val qrDone = System.nanoTime()
-
           val asvd = svd(rPart)
 
-          asvd.Vt(0 until dims, ::).t
-        }
-        logInfo(s"distsvdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
-
-        //Do the approximate PCA
-        val (p2, timing2) = time {
-          val res = new TruncatedSVD().computePartial(mat, dims, q)
-
-          val topres = res._2.t
-          topres
+          asvd
         }
 
-        val absdiff = abs(p1) - abs(p2)
+        for (
+          k <- conf.ks;
+          q <- conf.qs;
+          p <- conf.ps;
+          t <- 1 to conf.trials
+        ) {
+          val dims = math.ceil(k * d).toInt
 
-        logInfo(s"distapproxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
+          val p1 = asvd.Vt(0 until dims, ::).t
+          logInfo(s"distsvdPCA,$n,$d,$k,$q,0,$t,$dims,$timing,0.0,0.0")
 
-        logDebug(s"p1 ${shape(p1)}: $p1")
-        logDebug(s"p2 ${shape(p2)}: $p2")
+          //Do the approximate PCA
+          val (p2, timing2) = time {
+            val res = new TruncatedSVD().computePartial(mat, dims, q)
+
+            val topres = res._2.t
+            topres
+          }
+
+          val absdiff = abs(p1) - abs(p2)
+
+          logInfo(s"distapproxPCA,$n,$d,$k,$q,$p,$t,$dims,$timing2,${fro(absdiff) / (d * dims)},${approxError(p2, p1)}")
+
+          logDebug(s"p1 ${shape(p1)}: $p1")
+          logDebug(s"p2 ${shape(p2)}: $p2")
 
 
-        logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
-
+          logDebug(s"Max diff: ${absdiff.max}, norm: ${fro(absdiff)}")
+        }
       }
 
     }
