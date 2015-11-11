@@ -188,7 +188,7 @@ object PCATradeoffs extends Logging {
       local: Boolean = true,
       ns: Array[Int] = Array(1e4, 1e5, 1e6).map(_.toInt),
       ds: Array[Int] = Array(256, 512, 1024, 2048, 4096),
-      ks: Array[Double] = Array(1.0/256.0, 1.0/16.0, 1.0/4.0, 1.0/2.0, 1.0),
+      ks: Array[Double] = Array(1.0/256.0, 1.0/16.0, 1.0/4.0),
       qs: Array[Int] = Array(10),
       ps: Array[Int] = Array(5),
       numParts: Int = 256,
