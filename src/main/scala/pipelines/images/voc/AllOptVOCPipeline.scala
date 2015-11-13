@@ -126,7 +126,7 @@ object AllOptVOCPipeline extends Logging {
     gmmMeanFile: Option[String]= None,
     gmmVarFile: Option[String] = None,
     gmmWtsFile: Option[String] = None,
-    numPcaSamples: Int = 1e6.toInt,
+    numPcaSamples: Int = 1e5.toInt,
     numGmmSamples: Int = 1e6.toInt)
 
   def parse(args: Array[String]): SIFTFisherConfig = new OptionParser[SIFTFisherConfig](appName) {
