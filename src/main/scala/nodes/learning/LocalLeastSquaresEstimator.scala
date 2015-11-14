@@ -52,13 +52,15 @@ object LocalLeastSquaresEstimator {
     val labelScaler = new StandardScaler(normalizeStdDev = false).fit(trainingLabels)
     val featureScaler = new StandardScaler(normalizeStdDev = false).fit(trainingFeatures)
 
-    val A = RowPartitionedMatrix.fromArray(
-      featureScaler.apply(trainingFeatures).map(x => x.toArray))
-    val b = RowPartitionedMatrix.fromArray(
-      labelScaler.apply(trainingLabels).map(x => x.toArray))
+    val A_parts = featureScaler.apply(trainingFeatures).mapPartitions { x =>
+      Iterator.single(MatrixUtils.rowsToMatrix(x))
+    }.collect()
+    val b_parts = labelScaler.apply(trainingLabels).mapPartitions { x =>
+      Iterator.single(MatrixUtils.rowsToMatrix(x))
+    }.collect()
 
-    val A_local = A.collect()
-    val b_local = b.collect()
+    val A_local = DenseMatrix.vertcat(A_parts:_*)
+    val b_local = DenseMatrix.vertcat(b_parts:_*)
     
     val AAt = A_local * A_local.t 
     val model = A_local.t * ( (AAt + (DenseMatrix.eye[Double](AAt.rows) :* lambda)) \ b_local )
