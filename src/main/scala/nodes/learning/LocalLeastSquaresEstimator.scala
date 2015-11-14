@@ -12,7 +12,7 @@ import breeze.stats._
 import org.apache.spark.rdd.RDD
 
 import edu.berkeley.cs.amplab.mlmatrix.{RowPartition, NormalEquations, BlockCoordinateDescent, RowPartitionedMatrix}
-import nodes.stats.StandardScaler
+import nodes.stats.{StandardScaler, StandardScalerModel}
 
 import pipelines.Logging
 import utils.{MatrixUtils, Stats}
@@ -49,22 +49,25 @@ object LocalLeastSquaresEstimator {
       trainingLabels: RDD[DenseVector[Double]],
       lambda: Double) = {
 
-    val labelScaler = new StandardScaler(normalizeStdDev = false).fit(trainingLabels)
-    val featureScaler = new StandardScaler(normalizeStdDev = false).fit(trainingFeatures)
-
-    val A_parts = featureScaler.apply(trainingFeatures).mapPartitions { x =>
+    val A_parts = trainingFeatures.mapPartitions { x =>
       Iterator.single(MatrixUtils.rowsToMatrix(x))
     }.collect()
-    val b_parts = labelScaler.apply(trainingLabels).mapPartitions { x =>
+    val b_parts = trainingLabels.mapPartitions { x =>
       Iterator.single(MatrixUtils.rowsToMatrix(x))
     }.collect()
 
     val A_local = DenseMatrix.vertcat(A_parts:_*)
     val b_local = DenseMatrix.vertcat(b_parts:_*)
-    
-    val AAt = A_local * A_local.t 
-    val model = A_local.t * ( (AAt + (DenseMatrix.eye[Double](AAt.rows) :* lambda)) \ b_local )
-    LinearMapper(model, Some(labelScaler.mean), Some(featureScaler)) 
+
+    val featuresMean = mean(A_local(::, *)).toDenseVector
+    val labelsMean = mean(b_local(::, *)).toDenseVector
+
+    val A_zm = A_local(*, ::) - featuresMean
+    val b_zm = b_local(*, ::) - labelsMean
+
+    val AAt = A_zm * A_zm.t 
+    val model = A_zm.t * ( (AAt + (DenseMatrix.eye[Double](AAt.rows) :* lambda)) \ b_zm )
+    LinearMapper(model, Some(labelsMean), Some(new StandardScalerModel(featuresMean, None)))
   }
 
 }
