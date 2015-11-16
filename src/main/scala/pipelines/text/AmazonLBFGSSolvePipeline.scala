@@ -2,10 +2,10 @@ package pipelines.text
 
 import evaluation.BinaryClassifierEvaluator
 import loaders.{AmazonReviewsDataLoader, LabeledData}
-import nodes.learning.LogisticRegressionLBFGSEstimator
+import nodes.learning.{LeastSquaresSparseGradient, SparseLBFGSwithL2, LogisticRegressionLBFGSEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
-import nodes.util.CommonSparseFeatures
+import nodes.util.{MaxClassifier, CommonSparseFeatures}
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
 import scopt.OptionParser
@@ -33,7 +33,8 @@ object AmazonLBFGSSolvePipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = LogisticRegressionLBFGSEstimator(numIters = 20, cache = false).fit(featurizedTrainData, labels)
+    val model = new SparseLBFGSwithL2(new LeastSquaresSparseGradient, true, 2, numIterations=20).fit(featurizedTrainData, labels) andThen
+        MaxClassifier
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")

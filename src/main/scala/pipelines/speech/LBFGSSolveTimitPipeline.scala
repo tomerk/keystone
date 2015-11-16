@@ -3,8 +3,9 @@ package pipelines.speech
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
 import evaluation.MulticlassClassifierEvaluator
 import loaders.TimitFeaturesDataLoader
-import nodes.learning.LogisticRegressionLBFGSEstimator
+import nodes.learning.{LeastSquaresBatchGradient, LeastSquaresSparseGradient, LBFGSwithL2, LogisticRegressionLBFGSEstimator}
 import nodes.stats.CosineRandomFeatures
+import nodes.util.{ClassLabelIndicatorsFromIntLabels, MaxClassifier}
 import org.apache.commons.math3.random.MersenneTwister
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
@@ -51,7 +52,7 @@ object LBFGSSolveTimitPipeline extends Logging {
     // Build the pipeline
     val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
-    val trainLabels = trainDataAndLabels.map(_._1)
+    val trainLabels = ClassLabelIndicatorsFromIntLabels(TimitFeaturesDataLoader.numClasses).apply(trainDataAndLabels.map(_._1))
 
     val featurizer = if (conf.rfType == Distributions.Cauchy) {
       // TODO: Once https://github.com/scalanlp/breeze/issues/398 is released,
@@ -75,15 +76,16 @@ object LBFGSSolveTimitPipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = LogisticRegressionLBFGSEstimator(numClasses = TimitFeaturesDataLoader.numClasses, numIters = 20, cache = false).fit(featurizedTrainData, trainLabels) andThen
-        Transformer(_.toInt)
+    val model = new LBFGSwithL2(new LeastSquaresBatchGradient, numIterations=20).fit(featurizedTrainData, trainLabels) andThen
+        MaxClassifier
+
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
     logInfo("PIPELINE TIMING: Finished training the classifier")
 
     logInfo("PIPELINE TIMING: Evaluating the classifier")
-    val evaluator = MulticlassClassifierEvaluator(model(featurizedTrainData), trainLabels,
+    val evaluator = MulticlassClassifierEvaluator(model(featurizedTrainData), trainDataAndLabels.map(_._1),
       TimitFeaturesDataLoader.numClasses)
     logInfo("TRAIN Error is " + (100d * evaluator.totalError) + "%")
     logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))
