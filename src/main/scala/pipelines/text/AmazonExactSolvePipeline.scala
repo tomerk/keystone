@@ -2,12 +2,13 @@ package pipelines.text
 
 import evaluation.BinaryClassifierEvaluator
 import loaders.{AmazonReviewsDataLoader, LabeledData}
-import nodes.learning.{LinearMapEstimator, LogisticRegressionLBFGSEstimator}
+import nodes.learning.{BlockLeastSquaresEstimator, LinearMapEstimator, LogisticRegressionLBFGSEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.{MaxClassifier, ClassLabelIndicatorsFromIntLabels, CommonSparseFeatures}
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
+import pipelines.text.AmazonBlockSolvePipeline._
 import scopt.OptionParser
 import workflow.{Transformer, Optimizer}
 
@@ -34,8 +35,7 @@ object AmazonExactSolvePipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new LinearMapEstimator().fit(featurizedTrainData.map(_.toDenseVector), labels) andThen
-        MaxClassifier
+    val model = new LinearMapEstimator().fit(featurizedTrainData.map(_.toDenseVector), labels)
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
@@ -43,7 +43,10 @@ object AmazonExactSolvePipeline extends Logging {
     // Evaluate the classifier
     logInfo("PIPELINE TIMING: Evaluating the classifier")
 
-    val trainResults = model(featurizedTrainData.map(_.toDenseVector))
+    val loss = LinearMapEstimator.computeCost(featurizedTrainData.map(_.toDenseVector), labels, 0, model.x, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
+    val trainResults = MaxClassifier(model(featurizedTrainData.map(_.toDenseVector)))
     val eval = BinaryClassifierEvaluator(trainResults.map(_ > 0), trainData.labels.map(_ > 0))
 
     logInfo("\n" + eval.summary())

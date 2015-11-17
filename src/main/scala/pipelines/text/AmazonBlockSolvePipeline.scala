@@ -46,6 +46,9 @@ object AmazonBlockSolvePipeline extends Logging {
     // Evaluate the classifier
     logInfo("PIPELINE TIMING: Evaluating the classifier")
 
+    val loss = BlockLeastSquaresEstimator.computeCost(splitFeaturizedTrainData, labels, 0, model.xs, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
     val trainResults = MaxClassifier(model(splitFeaturizedTrainData))
     val eval = BinaryClassifierEvaluator(trainResults.map(_ > 0), trainData.labels.map(_ > 0))
 
