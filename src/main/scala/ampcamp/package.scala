@@ -16,7 +16,7 @@ package object ampcamp {
 
   private val newsgroupsDataMap = mutable.Map.empty[String, LabeledData[Int, String]]
   def loadNewsgroupsData(sc: SparkContext, dataDir: String): (RDD[String], RDD[Int]) = {
-    val trainLabeledData = newsgroupsDataMap.getOrElseUpdate(dataDir, LabeledData(sc.textFile(dataDir, 16).map(_.split(',')).map(x => (x(0).toInt, x(1))).cache()))
+    val trainLabeledData = newsgroupsDataMap.getOrElseUpdate(dataDir, LabeledData(sc.objectFile[(Int, String)](dataDir, 16).cache()))
     (trainLabeledData.data, trainLabeledData.labels)
   }
 
