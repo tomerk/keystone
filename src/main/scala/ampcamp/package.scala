@@ -16,9 +16,15 @@ package object ampcamp {
 
   private val newsgroupsDataMap = mutable.Map.empty[String, LabeledData[Int, String]]
   def loadNewsgroupsData(sc: SparkContext, dataDir: String): (RDD[String], RDD[Int]) = {
+    val trainLabeledData = newsgroupsDataMap.getOrElseUpdate(dataDir, LabeledData(sc.textFile(dataDir, 16).map(_.split(',')).map(x => (x(0).toInt, x(1))).cache()))
+    (trainLabeledData.data, trainLabeledData.labels)
+  }
+
+  def loadNewsgroupsDataOld(sc: SparkContext, dataDir: String): (RDD[String], RDD[Int]) = {
     val trainLabeledData = newsgroupsDataMap.getOrElseUpdate(dataDir, LabeledData(NewsgroupsDataLoader(sc, dataDir).labeledData.cache()))
     (trainLabeledData.data, trainLabeledData.labels)
   }
+
 
   // Define load & eval methods here
   def evalNewsgroupsPipeline(pipeline: Pipeline[String, Int], sc: SparkContext, dataDir: String): Unit = {
