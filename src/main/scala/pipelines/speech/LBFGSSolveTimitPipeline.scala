@@ -3,7 +3,7 @@ package pipelines.speech
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
 import evaluation.MulticlassClassifierEvaluator
 import loaders.TimitFeaturesDataLoader
-import nodes.learning.{LeastSquaresBatchGradient, LeastSquaresSparseGradient, LBFGSwithL2, LogisticRegressionLBFGSEstimator}
+import nodes.learning._
 import nodes.stats.CosineRandomFeatures
 import nodes.util.{ClassLabelIndicatorsFromIntLabels, MaxClassifier}
 import org.apache.commons.math3.random.MersenneTwister
@@ -76,16 +76,18 @@ object LBFGSSolveTimitPipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new LBFGSwithL2(new LeastSquaresBatchGradient, numIterations=20).fit(featurizedTrainData, trainLabels) andThen
-        MaxClassifier
+    val model = new LBFGSwithL2(new LeastSquaresBatchGradient, numIterations=20).fit(featurizedTrainData, trainLabels)
 
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
     logInfo("PIPELINE TIMING: Finished training the classifier")
 
+    val loss = LinearMapEstimator.computeCost(featurizedTrainData, trainLabels, conf.lambda, model.x, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
     logInfo("PIPELINE TIMING: Evaluating the classifier")
-    val evaluator = MulticlassClassifierEvaluator(model(featurizedTrainData), trainDataAndLabels.map(_._1),
+    val evaluator = MulticlassClassifierEvaluator(MaxClassifier(model(featurizedTrainData)), trainDataAndLabels.map(_._1),
       TimitFeaturesDataLoader.numClasses)
     logInfo("TRAIN Error is " + (100d * evaluator.totalError) + "%")
     logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))
