@@ -33,7 +33,7 @@ object AmazonLBFGSSolvePipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new SparseLBFGSwithL2(new LeastSquaresSparseGradient, true, 2, numIterations=20).fit(featurizedTrainData, labels) andThen
+    val model = new SparseLBFGSwithL2(new LeastSquaresSparseGradient(2), false, 2, numIterations=20).fit(featurizedTrainData, labels) andThen
         MaxClassifier
     val solveEndTime  = System.currentTimeMillis()
 

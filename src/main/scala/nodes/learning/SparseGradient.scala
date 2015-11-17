@@ -29,7 +29,7 @@ trait SparseGradient extends Serializable {
     : Double
 }
 
-class LeastSquaresSparseGradient extends SparseGradient {
+class LeastSquaresSparseGradient(numClasses: Int) extends SparseGradient {
   
   def compute(
       data: SparseVector[Double],
@@ -38,25 +38,49 @@ class LeastSquaresSparseGradient extends SparseGradient {
       cumGradient: DenseMatrix[Double])
     : Double = {
 
-    // Least Squares Gradient is At.(Ax - b)
-    val axb = weights.t * data
-    axb -= labels
+    val loss = if (numClasses == 2) {
+      // Data is  dx1
 
-    var offset = 0
-    while(offset < data.activeSize) {
-      val index = data.indexAt(offset)
-      val value = data.valueAt(offset)
-      cumGradient(index, ::) += (axb.t * value)
-      offset += 1
+      // axb is 0
+      var axb = 0.0
+
+      var offset = 0
+      while(offset < data.activeSize) {
+        val index = data.indexAt(offset)
+        val value = data.valueAt(offset)
+        axb += weights.data(index) * value 
+        offset += 1
+      }
+
+      axb -= labels(0)
+
+      offset = 0
+      while(offset < data.activeSize) {
+        val index = data.indexAt(offset)
+        val value = data.valueAt(offset)
+        val gradUpdate = (axb * value)
+        cumGradient(index, 0) += gradUpdate 
+        offset += 1
+      }
+
+      val loss = 0.5 * axb * axb
+      loss
+
+    } else {
+      // Least Squares Gradient is At.(Ax - b)
+      val axb = weights.t * data
+      axb -= labels
+
+      var offset = 0
+      while(offset < data.activeSize) {
+        val index = data.indexAt(offset)
+        val value = data.valueAt(offset)
+        cumGradient(index, ::) += (axb.t * value)
+        offset += 1
+      }
+      val loss = 0.5 * math.pow(norm(axb), 2)
+      loss
     }
-
-    // val dataMat = new CSCMatrix[Double](
-    //   data.data, data.length, 1, Array(0, data.used), data.index)
-    // cumGradient += dataMat * axb.asDenseMatrix // (axb.asDenseMatrix.t * dataMat.t).t
-    // Loss is 0.5 * norm(Ax - b)
-
-    val loss = 0.5 * math.pow(norm(axb), 2)
-
     loss
   }
 

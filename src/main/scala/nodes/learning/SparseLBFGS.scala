@@ -55,9 +55,21 @@ case class SparseLinearMapper(
    */
   def apply(in: SparseVector[Double]): DenseVector[Double] = {
     val out = x.t * in
-    bOpt.map { b =>
+    val bout = bOpt.map { b =>
       out :+= b
     }.getOrElse(out)
+
+    if (bout.length == 1) {
+      val boutEx = (DenseVector.ones[Double](2) * -1.0)
+      if (bout(0) > 0) {
+        boutEx(1) = 1.0
+      } else {
+        boutEx(0) = 1.0
+      }
+      boutEx
+    } else {
+      out
+    }
   }
 
   /**
@@ -71,9 +83,21 @@ case class SparseLinearMapper(
     val bBroadcast = in.context.broadcast(bOpt)
     in.map(row => {
       val out = modelBroadcast.value.t * row
-      bOpt.map { b =>
+      val bout = bOpt.map { b =>
         out :+= b
       }.getOrElse(out)
+
+      if (bout.length == 1) {
+        val boutEx = (DenseVector.ones[Double](2) * -1.0) 
+        if (bout(0) > 0) {
+          boutEx(1) = 1.0
+        } else {
+          boutEx(0) = 1.0
+        }
+        boutEx
+      } else {
+        out
+      }
     })
   }
 }
@@ -113,11 +137,19 @@ class SparseLBFGSwithL2(
     }
 
     // Convert labels to +1, -1
-    val labelsVec = labels.map { x =>
-      assert(x < numClasses)
-      val out = DenseVector.ones[Double](numClasses) * -1.0
-      out(x) = 1.0
-      out
+    val labelsVec = if (numClasses == 2) {
+      labels.map { x =>
+        val out = DenseVector.ones[Double](1)
+        out(0) = 2.0*x - 1.0
+        out
+      }
+    } else {
+      labels.map { x =>
+        assert(x < numClasses)
+        val out = DenseVector.ones[Double](numClasses) * -1.0
+        out(x) = 1.0
+        out
+      }
     }
 
     val model = SparseLBFGSwithL2.runLBFGS(
@@ -160,7 +192,11 @@ object SparseLBFGSwithL2 extends Logging {
 
     val lbfgs = new BreezeLBFGS[DenseVector[Double]](maxNumIterations, numCorrections, convergenceTol)
 
-    val initialWeights = DenseVector.zeros[Double](numFeatures * numClasses)
+    val initialWeights = if (numClasses == 2) {
+      DenseVector.zeros[Double](numFeatures)
+    } else {
+      DenseVector.zeros[Double](numFeatures * numClasses)
+    }
 
     val states =
       lbfgs.iterations(new CachedDiffFunction(costFun), initialWeights)
@@ -175,7 +211,11 @@ object SparseLBFGSwithL2 extends Logging {
       state = states.next()
     }
     lossHistory += state.value
-    val finalWeights = state.x.asDenseMatrix.reshape(numFeatures, numClasses)
+    val finalWeights = if (numClasses == 2) {
+      state.x.asDenseMatrix.reshape(numFeatures, 1)
+    } else {
+      state.x.asDenseMatrix.reshape(numFeatures, numClasses)
+    }
 
     val lossHistoryArray = lossHistory.result()
 
@@ -199,13 +239,16 @@ object SparseLBFGSwithL2 extends Logging {
     numClasses: Int) extends DiffFunction[DenseVector[Double]] {
 
     override def calculate(weights: DenseVector[Double]): (Double, DenseVector[Double]) = {
-      val weightsMat = weights.asDenseMatrix.reshape(numFeatures, numClasses)
+
+      val actualNumClasses = if (numClasses == 2) 1 else numClasses
+
+      val weightsMat = weights.asDenseMatrix.reshape(numFeatures, actualNumClasses)
       // Have a local copy to avoid the serialization of CostFun object which is not serializable.
       val bcW = data.context.broadcast(weightsMat)
       val localGradient = gradient
 
       val (gradientSum, lossSum) = data.zip(labels).treeAggregate(
-        (DenseMatrix.zeros[Double](numFeatures, numClasses), 0.0))(
+        (DenseMatrix.zeros[Double](numFeatures, actualNumClasses), 0.0))(
         seqOp = (c, v) => (c, v) match { case ((grad, loss), (feature, label)) =>
           val l = localGradient.compute(feature, label, bcW.value, grad)
           (grad, loss + l)

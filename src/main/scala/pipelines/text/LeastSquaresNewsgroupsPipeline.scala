@@ -28,7 +28,7 @@ object LeastSquaresNewsgroupsPipeline extends Logging {
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), trainData.data) andThen
         new Cacher andThen
-        (new SparseLBFGSwithL2(new LeastSquaresSparseGradient, true, numClasses, numIterations=20), trainData.data, trainData.labels) andThen
+        (new SparseLBFGSwithL2(new LeastSquaresSparseGradient(numClasses), true, numClasses, numIterations=20), trainData.data, trainData.labels) andThen
         MaxClassifier
 //       (LogisticRegressionLBFGSEstimator(numClasses, numIters = 20), trainData.data, trainData.labels) andThen
 //       Transformer(_.toInt)
