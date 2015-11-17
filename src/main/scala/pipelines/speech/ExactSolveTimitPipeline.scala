@@ -76,15 +76,17 @@ object ExactSolveTimitPipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new LinearMapEstimator().fit(featurizedTrainData, trainLabels) andThen
-        MaxClassifier
+    val model = new LinearMapEstimator().fit(featurizedTrainData, trainLabels)
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
     logInfo("PIPELINE TIMING: Finished training the classifier")
 
+    val loss = LinearMapEstimator.computeCost(featurizedTrainData, trainLabels, conf.lambda, model.x, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
     logInfo("PIPELINE TIMING: Evaluating the classifier")
-    val evaluator = MulticlassClassifierEvaluator(model(featurizedTrainData), trainDataAndLabels.map(_._1),
+    val evaluator = MulticlassClassifierEvaluator(MaxClassifier(model(featurizedTrainData)), trainDataAndLabels.map(_._1),
       TimitFeaturesDataLoader.numClasses)
     logInfo("TRAIN Error is " + (100d * evaluator.totalError) + "%")
     logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))

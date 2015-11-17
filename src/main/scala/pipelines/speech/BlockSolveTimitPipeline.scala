@@ -94,6 +94,10 @@ object BlockSolveTimitPipeline extends Logging {
     logInfo("PIPELINE TIMING: Finished training the classifier")
 
     logInfo("PIPELINE TIMING: Evaluating the classifier")
+
+    val loss = BlockLeastSquaresEstimator.computeCost(trainingBatches, trainLabels, conf.lambda, model.xs, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
     val evaluator = MulticlassClassifierEvaluator(MaxClassifier(model.apply(trainingBatches)), trainDataAndLabels.map(_._1),
       TimitFeaturesDataLoader.numClasses)
     logInfo("TRAIN Error is " + (100d * evaluator.totalError) + "%")
