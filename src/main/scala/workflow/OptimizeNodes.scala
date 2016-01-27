@@ -2,8 +2,6 @@ package workflow
 
 import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable.ArrayBuffer
-
 /**
  * Node-level optimization, such as selecting a Linear Solver
  *
@@ -31,7 +29,7 @@ class OptimizeNodes(sampleFraction: Double = 0.01, seed: Long = 0) extends Rule 
         }
 
       case _ => Set[Int]()
-    }.reduce(_ union _) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions)
+    }.fold(Set())(_ union _) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions) - Pipeline.SOURCE
 
     // Execute the minimal amount necessary of the pipeline on sampled nodes, and optimize the optimizable nodes
     val optimizedInstructions = instructions.toArray

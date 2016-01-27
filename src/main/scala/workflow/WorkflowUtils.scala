@@ -60,10 +60,10 @@ object WorkflowUtils {
     val fitDeps = pipeline.fitDeps
     val sink = pipeline.sink
 
-    pipelineRecurse(sink, nodes, dataDeps, fitDeps, Map(Pipeline.SOURCE -> Pipeline.SOURCE), Seq())._2
+    pipelineToInstructionsRecursion(sink, nodes, dataDeps, fitDeps, Map(Pipeline.SOURCE -> Pipeline.SOURCE), Seq())._2
   }
 
-  def pipelineRecurse(
+  def pipelineToInstructionsRecursion(
     current: Int,
     nodes: Seq[Node],
     dataDeps: Seq[Seq[Int]],
@@ -73,10 +73,10 @@ object WorkflowUtils {
   ): (Map[Int, Int], Seq[Instruction]) = {
     var curIdMap = nodeIdToInstructionId
     var curInstructions = instructions
-    System.out.println(current)
+
     for (dep <- fitDeps(current)) {
       if (!curIdMap.contains(dep) && dep != Pipeline.SOURCE) {
-        val (newIdMap, newInstructions) = pipelineRecurse(dep, nodes, dataDeps, fitDeps, curIdMap, curInstructions)
+        val (newIdMap, newInstructions) = pipelineToInstructionsRecursion(dep, nodes, dataDeps, fitDeps, curIdMap, curInstructions)
         curIdMap = newIdMap
         curInstructions = newInstructions
       }
@@ -84,7 +84,7 @@ object WorkflowUtils {
 
     for (dep <- dataDeps(current)) {
       if (!curIdMap.contains(dep) && dep != Pipeline.SOURCE) {
-        val (newIdMap, newInstructions) = pipelineRecurse(dep, nodes, dataDeps, fitDeps, curIdMap, curInstructions)
+        val (newIdMap, newInstructions) = pipelineToInstructionsRecursion(dep, nodes, dataDeps, fitDeps, curIdMap, curInstructions)
         curIdMap = newIdMap
         curInstructions = newInstructions
       }
@@ -152,9 +152,10 @@ object WorkflowUtils {
    * @return
    */
   def getParents(id: Int, instructions: Seq[Instruction]): Set[Int] = {
-    instructions(id).getDependencies.map {
+    val dependencies = if (id != Pipeline.SOURCE) instructions(id).getDependencies else Seq()
+    dependencies.map {
       parent => getParents(parent, instructions) + parent
-    }.reduce(_ union _)
+    }.fold(Set())(_ union _)
   }
 
   def numPerPartition[T](rdd: RDD[T]): Map[Int, Int] = {
