@@ -4,7 +4,10 @@ package workflow
  * Optimizes a Pipeline DAG
  */
 object DefaultOptimizer extends Optimizer {
-  protected val batches: Seq[Batch] = Batch("DAG Optimization", FixedPoint(100), EquivalentNodeMerger) :: Nil
+  protected val batches: Seq[Batch] =
+    Batch("DAG Optimization", FixedPoint(100), EquivalentNodeMerger) ::
+    Batch("Node Level Optimization", Once, new OptimizeNodes) ::
+      Nil
 }
 
 /**
