@@ -29,7 +29,7 @@ class OptimizeNodes(sampleFraction: Double = 0.01, seed: Long = 0) extends Rule 
         }
 
       case _ => Set[Int]()
-    }.fold(Set())(_ union _) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions) - Pipeline.SOURCE
+    }.reduce(_ union _) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions) - Pipeline.SOURCE
 
     // Execute the minimal amount necessary of the pipeline on sampled nodes, and optimize the optimizable nodes
     val optimizedInstructions = instructions.toArray
