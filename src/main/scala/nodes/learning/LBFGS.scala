@@ -139,7 +139,7 @@ class DenseLBFGSwithL2(
     val regParam: Double = 0.0)
   extends LabelEstimator[DenseVector[Double], DenseVector[Double], DenseVector[Double]] {
 
-  def fit(data: RDD[DenseVector[Double]], labels: RDD[DenseVector[Double]]): LinearMapper = {
+  def fit(data: RDD[DenseVector[Double]], labels: RDD[DenseVector[Double]]): LinearMapper[DenseVector[Double]] = {
     if (fitIntercept) {
       val featureScaler = new StandardScaler(normalizeStdDev = false).fit(data)
       val labelScaler = new StandardScaler(normalizeStdDev = false).fit(labels)
@@ -186,7 +186,7 @@ class SparseLBFGSwithL2(
     val regParam: Double = 0.0)
   extends LabelEstimator[SparseVector[Double], DenseVector[Double], DenseVector[Double]] {
 
-  def fit(data: RDD[SparseVector[Double]], labels: RDD[DenseVector[Double]]): SparseLinearMapper = {
+  def fit(data: RDD[SparseVector[Double]], labels: RDD[DenseVector[Double]]): LinearMapper[SparseVector[Double]] = {
     if (fitIntercept) {
       // To fit the intercept, we add a column of ones to the data
       val dataWithOnesColumn = data.map { vec =>
@@ -213,7 +213,7 @@ class SparseLBFGSwithL2(
       val weights = model(0 until (model.rows - 1), ::).copy
       val intercept = model(model.rows - 1, ::).t
 
-      new SparseLinearMapper(weights, Some(intercept))
+      new LinearMapper[SparseVector[Double]](weights, bOpt = Some(intercept), featureScaler = None)
     } else {
       val model = LBFGSwithL2.runLBFGS(
         data,
@@ -224,7 +224,7 @@ class SparseLBFGSwithL2(
         numIterations,
         regParam)
 
-      new SparseLinearMapper(model, None)
+      new LinearMapper[SparseVector[Double]](model, bOpt = None, featureScaler = None)
     }
   }
 }
