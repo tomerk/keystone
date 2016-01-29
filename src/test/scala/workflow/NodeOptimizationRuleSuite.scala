@@ -1,6 +1,6 @@
 package workflow
 
-import OptimizeNodesSuite._
+import NodeOptimizationRuleSuite._
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -9,7 +9,7 @@ import pipelines.{LocalSparkContext, Logging}
 
 import scala.util.Random
 
-class OptimizeNodesSuite extends FunSuite with LocalSparkContext with Logging {
+class NodeOptimizationRuleSuite extends FunSuite with LocalSparkContext with Logging {
   test("Test node level optimizations choice some false") {
     sc = new SparkContext("local", "test")
 
@@ -24,7 +24,7 @@ class OptimizeNodesSuite extends FunSuite with LocalSparkContext with Logging {
       (optimizableEstimator, trainData) andThen
       (optimizableLabelEstimator, trainData, trainLabels)
 
-    val nodeOptimizedPipeline = new OptimizeNodes(0.01).apply(pipeline)
+    val nodeOptimizedPipeline = new NodeOptimizationRule(0.01).apply(pipeline)
     val outputState = nodeOptimizedPipeline.apply(State(), optimizer = None)
 
     assert(outputState.transformerChoice.isEmpty, "The optimizable transformer should use the default on test data")
@@ -45,7 +45,7 @@ class OptimizeNodesSuite extends FunSuite with LocalSparkContext with Logging {
       (optimizableEstimator, trainData) andThen
       (optimizableLabelEstimator, trainData, trainLabels)
 
-    val nodeOptimizedPipeline = new OptimizeNodes(0.01).apply(pipeline)
+    val nodeOptimizedPipeline = new NodeOptimizationRule(0.01).apply(pipeline)
     val outputState = nodeOptimizedPipeline.apply(State(), optimizer = None)
 
     assert(outputState.transformerChoice.isEmpty, "The optimizable transformer should use the default on test data")
@@ -66,7 +66,7 @@ class OptimizeNodesSuite extends FunSuite with LocalSparkContext with Logging {
       (estimatorB, trainData) andThen
       (labelEstimatorB, trainData, trainLabels)
 
-    val nodeOptimizedPipeline = new OptimizeNodes(0.01).apply(pipeline)
+    val nodeOptimizedPipeline = new NodeOptimizationRule(0.01).apply(pipeline)
     val outputState = nodeOptimizedPipeline.apply(State(), optimizer = None)
 
     assert(outputState === State(None, Some(false), Some(true), Some(true)))
@@ -84,14 +84,14 @@ class OptimizeNodesSuite extends FunSuite with LocalSparkContext with Logging {
       (estimatorB, trainData) andThen
       (optimizableLabelEstimator, trainData, trainLabels)
 
-    val nodeOptimizedPipeline = new OptimizeNodes(0.01).apply(pipeline)
+    val nodeOptimizedPipeline = new NodeOptimizationRule(0.01).apply(pipeline)
     val outputState = nodeOptimizedPipeline.apply(State(), optimizer = None)
 
     assert(outputState === State(None, Some(false), Some(true), Some(true)))
   }
 }
 
-object OptimizeNodesSuite {
+object NodeOptimizationRuleSuite {
   case class State(choice: Option[Boolean] = None, transformerChoice: Option[Boolean] = None, estimatorChoice: Option[Boolean] = None, labelEstimatorChoice: Option[Boolean] = None)
 
   val transformerDoNothing = Transformer[State, State] { x =>

@@ -7,7 +7,7 @@ import org.apache.spark.rdd.RDD
  *
  * @param sampleFraction The fraction of the RDD to use for operations
  */
-class OptimizeNodes(sampleFraction: Double = 0.01, seed: Long = 0) extends Rule {
+class NodeOptimizationRule(sampleFraction: Double = 0.01, seed: Long = 0) extends Rule {
   override def apply[A, B](plan: Pipeline[A, B]): Pipeline[A, B] = {
     val instructions = WorkflowUtils.pipelineToInstructions(plan)
 
