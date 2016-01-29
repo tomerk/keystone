@@ -9,11 +9,10 @@ import scala.reflect._
 
 class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
     lambda: Double = 0,
-    clusterProfile: ClusterProfile = ClusterProfile(
-      numMachines = 16,
-      cpuWeight = 0.2,
-      memWeight = 0.0833,
-      networkWeight = 8.33))
+    numMachines: Option[Int] = None,
+    cpuWeight: Double = 0.2,
+    memWeight: Double = 0.0833,
+    networkWeight: Double = 8.33)
   extends OptimizableLabelEstimator[T, DenseVector[Double], DenseVector[Double]] {
 
   val options: Seq[SolverWithCostModel[T]] = Seq(
@@ -35,8 +34,11 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
     val k = sampleLabels.first().length
     val sparsity = sample.map(x => x.activeSize / x.length).sum() / sample.count()
 
-    val dataProfile = DataProfile(n = n, d = d, k = k, sparsity = sparsity)
+    val realNumMachines = numMachines.getOrElse {
+      // TODO: This may count the driver in cluster mode, in which case we need to subtract one (but not in local mode)
+      sample.sparkContext.getExecutorStorageStatus.length
+    }
 
-    options.minBy(_.cost(dataProfile, clusterProfile))
+    options.minBy(_.cost(n, d, k, sparsity, realNumMachines, cpuWeight, memWeight, networkWeight))
   }
 }

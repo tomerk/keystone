@@ -104,15 +104,21 @@ case class LinearMapEstimator[T <: Vector[Double]](lambda: Option[Double] = None
     LinearMapper(x, Some(labelScaler.mean), Some(featureScaler))
   }
 
-  override def cost(dataProfile: DataProfile, clusterProfile: ClusterProfile): Double = {
-    (dataProfile, clusterProfile) match {
-      case (DataProfile(n, d, k, sparsity), ClusterProfile(numMachines, cpuWeight, memWeight, networkWeight)) =>
-        val flops = n.toDouble * d * (d + k) / numMachines.toDouble
-        val bytesScanned = n.toDouble * d / numMachines.toDouble + (d.toDouble * d)
-        val network = d.toDouble * (d + k)
+  override def cost(
+    n: Long,
+    d: Int,
+    k: Int,
+    sparsity: Double,
+    numMachines: Int,
+    cpuWeight: Double,
+    memWeight: Double,
+    networkWeight: Double)
+  : Double = {
+    val flops = n.toDouble * d * (d + k) / numMachines.toDouble
+    val bytesScanned = n.toDouble * d / numMachines.toDouble + (d.toDouble * d)
+    val network = d.toDouble * (d + k)
 
-        math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network
-    }
+    math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network
   }
 }
 

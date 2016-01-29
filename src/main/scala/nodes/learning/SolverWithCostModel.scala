@@ -9,8 +9,14 @@ import workflow.LabelEstimator
 trait SolverWithCostModel[T <: Vector[Double]]
   extends LabelEstimator[T, DenseVector[Double], DenseVector[Double]] {
 
-  def cost(dataProfile: DataProfile, clusterProfile: ClusterProfile): Double
+  def cost(
+    n: Long,
+    d: Int,
+    k: Int,
+    sparsity: Double,
+    numMachines: Int,
+    cpuWeight: Double,
+    memWeight: Double,
+    networkWeight: Double)
+  : Double
 }
-
-case class DataProfile(n: Long, d: Int, k: Int, sparsity: Double)
-case class ClusterProfile(numMachines: Int, cpuWeight: Double, memWeight: Double, networkWeight: Double)
