@@ -26,9 +26,9 @@ case class LeastSquaresSparseLBFGSwithL2[T <: Vector[Double]](
     (dataProfile, clusterProfile) match {
       case (DataProfile(n, d, k, sparsity), ClusterProfile(numMachines, cpuWeight, memWeight, networkWeight)) =>
 
-        val flops =  n * sparsity * d * k / numMachines.toDouble // Time to compute a sparse gradient.
-        val bytesScanned = n * d * sparsity
-        val network = 2 * d * k * math.log(numMachines) // Need to communicate the dense model. Treereduce
+        val flops =  n.toDouble * sparsity * d * k / numMachines // Time to compute a sparse gradient.
+        val bytesScanned = n.toDouble * d * sparsity
+        val network = 2.0 * d * k * math.log(numMachines) // Need to communicate the dense model. Treereduce
 
         numIterations *
           (sparseOverhead * math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network)
@@ -58,9 +58,9 @@ case class LeastSquaresDenseLBFGSwithL2[T <: Vector[Double]](
     (dataProfile, clusterProfile) match {
       case (DataProfile(n, d, k, sparsity), ClusterProfile(numMachines, cpuWeight, memWeight, networkWeight)) =>
 
-        val flops =  n * sparsity * d * k / numMachines.toDouble // Time to compute a sparse gradient.
-      val bytesScanned = n * d * sparsity
-        val network = 2 * d * k * math.log(numMachines) // Need to communicate the dense model. Treereduce
+        val flops =  n.toDouble * sparsity * d * k / numMachines // Time to compute a sparse gradient.
+        val bytesScanned = n.toDouble * d * sparsity
+        val network = 2.0 * d * k * math.log(numMachines) // Need to communicate the dense model. Treereduce
 
         numIterations *
           (math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network)

@@ -12,5 +12,5 @@ trait SolverWithCostModel[T <: Vector[Double]]
   def cost(dataProfile: DataProfile, clusterProfile: ClusterProfile): Double
 }
 
-case class DataProfile(n: Int, d: Int, k: Int, sparsity: Double)
+case class DataProfile(n: Long, d: Int, k: Int, sparsity: Double)
 case class ClusterProfile(numMachines: Int, cpuWeight: Double, memWeight: Double, networkWeight: Double)
