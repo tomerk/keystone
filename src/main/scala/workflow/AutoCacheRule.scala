@@ -2,6 +2,7 @@ package workflow
 
 import breeze.linalg.{max, DenseVector, DenseMatrix}
 import org.apache.spark.rdd.RDD
+import pipelines.Logging
 
 case class Profile(ns: Long, mem: Long) {
   def +(p: Profile) = Profile(this.ns + p.ns, this.mem + p.mem)
@@ -10,14 +11,55 @@ case class Profile(ns: Long, mem: Long) {
 case class SampleProfile(scale: Long, profile: Profile)
 
 class AutoCacheRule(
-    profileScales: Seq[Long] = Seq(5000, 10000),
-    numProfileTrials: Int = 1
-  ) extends Rule {
+    profileScales: Seq[Long] = Seq(500, 1000),
+    numProfileTrials: Int = 2
+  ) extends Rule with Logging {
 
-  private def numPerPartition[T](rdd: RDD[T]): Map[Int, Int] = {
-    rdd.mapPartitionsWithIndex {
-      case (id, partition) => Iterator.single((id, partition.length))
-    }.collect().toMap
+  /**
+   * Get the node weights: estimates for how many passes an instruction will make over its input dependencies
+   */
+  def getNodeWeights(instructions: Seq[Instruction]): Map[Int, Int] = {
+    instructions.zipWithIndex.map {
+      case (TransformerApplyNode(transformer, _), i) => instructions(transformer) match {
+        case node: WeightedNode => (i, node.weight)
+        case _ => (i, 1)
+      }
+      case (EstimatorFitNode(estimator, _), i) => instructions(estimator) match {
+        case node: WeightedNode => (i, node.weight)
+        case _ => (i, 1)
+      }
+      case (_, i) => (i, 1)
+    }.toMap
+  }
+
+  /**
+   * Get a map representing the immediate children for each instruction
+   * Note: This doesn't capture how many times each child depended on the instruction
+   */
+  def getImmediateChildrenByInstruction(instructions: Seq[Instruction]): Map[Int, Set[Int]] = {
+    instructions.indices.map(i => (i, WorkflowUtils.getChildren(i, instructions))).toMap
+  }
+
+  /**
+   * Get an estimate for how many times each instruction will be executed, assuming
+   * the given set of instructions have their outputs cached
+   */
+  def getRuns(instructions: Seq[Instruction], cache: Set[Int], nodeWeights: Map[Int, Int]): Map[Int, Int] = {
+    val immediateChildrenByInstruction = getImmediateChildrenByInstruction(instructions)
+
+    instructions.indices.foldRight(Map[Int, Int]()) { case (i, runsByIndex) =>
+      if (immediateChildrenByInstruction(i).isEmpty) {
+        runsByIndex + (i -> 1)
+      }
+      else {
+        val runs = immediateChildrenByInstruction(i).map(j => if (cache.contains(j)) {
+          nodeWeights(j)
+        } else {
+          nodeWeights(j) * runsByIndex(j)
+        }).sum
+        runsByIndex + (i -> runs)
+      }
+    }
   }
 
   def generalizeProfiles(newScale: Long, sampleProfiles: Seq[SampleProfile]): Profile = {
@@ -62,7 +104,7 @@ class AutoCacheRule(
     for ((instruction, i) <- instructions.zipWithIndex if instructionsToProfile.contains(i)) {
       instruction match {
         case SourceNode(rdd) =>
-          val npp = numPerPartition(rdd)
+          val npp = WorkflowUtils.numPerPartition(rdd)
           numPerPartitionPerNode(i) = npp
 
           val totalCount = npp.values.map(_.toLong).sum
@@ -95,7 +137,7 @@ class AutoCacheRule(
               sample.unpersist()
             }
 
-            SampleProfile(scale, Profile(duration, memSize))
+            SampleProfile(scaledNumPerPartition.values.sum, Profile(duration, memSize))
           }
 
           profiles(i) = generalizeProfiles(totalCount, sampleProfiles)
@@ -148,7 +190,7 @@ class AutoCacheRule(
               sample.unpersist()
             }
 
-            SampleProfile(scale, Profile(duration, memSize))
+            SampleProfile(scaledNumPerPartition.values.sum, Profile(duration, memSize))
           }
 
           profiles(i) = generalizeProfiles(totalCount, sampleProfiles)
