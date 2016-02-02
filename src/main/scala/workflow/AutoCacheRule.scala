@@ -1,6 +1,7 @@
 package workflow
 
 import breeze.linalg.{max, DenseVector, DenseMatrix}
+import nodes.util.Cacher
 import org.apache.spark.rdd.RDD
 import pipelines.Logging
 
@@ -203,6 +204,44 @@ class AutoCacheRule(
     }
 
     profiles.toMap
+  }
+
+  def estimateCachedRunTime(instructions: Seq[Instruction], cached: Set[Int], profiles: Map[Int, Profile]): Double = {
+
+    val nodeWeights = getNodeWeights(instructions)
+    val runs = getRuns(instructions, cached, nodeWeights)
+
+    val localWork = instructions.indices.map(i => profiles.getOrElse(i, Profile(0, 0)).ns.toDouble).toArray
+    instructions.indices.map(i => localWork(i) * runs(i)).sum
+  }
+
+  /**
+   * Given a seq of instructions and a set of indices to cache - return an instruction seq with the indices cached.
+   */
+  def makeCachedPipeline(pipe: Seq[Instruction], cached: Set[Int]): Seq[Instruction] = {
+    // Find the indexes of the new caching nodes. We only cache instructions that produce RDDs
+    val filteredCaches = pipe.zipWithIndex.filter {
+      case (TransformerApplyNode(_, _), _) => true
+      case (SourceNode(_), _) => true
+      case _ => false
+    }.map(_._2).toSet
+
+    val toCache = cached.intersect(filteredCaches)
+
+    pipe.indices.foldLeft((Seq[Instruction](), pipe.indices.zipWithIndex.toMap)) {
+      case ((newPipe, oldToNewIndexMap), i) if toCache.contains(i) =>
+        (newPipe ++ Seq(
+          pipe(i).mapDependencies(oldToNewIndexMap),
+          new Cacher,
+          TransformerApplyNode(oldToNewIndexMap(i) + 1, Seq(oldToNewIndexMap(i)))
+        ),
+        oldToNewIndexMap.map {
+          case (key, value) => if (key >= i) (key, value + 2) else (key, value)
+        })
+
+      case ((newPipe, oldToNewIndexMap), i) =>
+        (newPipe :+ pipe(i).mapDependencies(oldToNewIndexMap), oldToNewIndexMap)
+    }._1
   }
 
   override def apply[A, B](plan: Pipeline[A, B]): Pipeline[A, B] = {
