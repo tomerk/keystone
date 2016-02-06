@@ -1,0 +1,9 @@
+Install Tensorflow (0.6.0)
+
+run:
+python cifar10_train.py
+
+For as long as desired. It will make a checkpoint every 391 steps (~ 1 epoch)
+
+Then to get eval precision for the checkpoints execute:
+for i in {0..$CHECKPOINT_NUM}; do python cifar10_eval.py --run_once --checkpoint_index=$i 2> /dev/null; done
