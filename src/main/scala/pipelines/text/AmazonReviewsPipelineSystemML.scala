@@ -17,23 +17,26 @@ object AmazonReviewsPipelineSystemML extends Logging {
   val appName = "AmazonReviewsPipeline"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
-    val amazonTrainData = AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData
-    val trainData = LabeledData(amazonTrainData.repartition(conf.numParts).cache())
+    logInfo("PIPELINE TIMING: Started training the classifier")
+    val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
 
     val training = trainData.data
     val labels = trainData.labels
 
     // Build the classifier estimator
-    val featurizer = Trim andThen
-        LowerCase() andThen
-        Tokenizer() andThen
-        NGramsFeaturizer(1 to conf.nGrams) andThen
-        TermFrequency(x => 1) andThen
-        (CommonSparseFeatures(conf.commonFeatures), training)
+    logInfo("Training classifier")
+    val featurizer = Trim andThen LowerCase() andThen
+      Tokenizer() andThen
+      NGramsFeaturizer(1 to conf.nGrams) andThen
+      TermFrequency(x => 1) andThen
+      (CommonSparseFeatures(conf.commonFeatures), training)
 
-    val features = featurizer(trainData.data)
+    val featurizedTrainData = featurizer.apply(training).cache()
+    featurizedTrainData.count()
 
-    val featuresToMatrixCell = features.zipWithIndex().flatMap {
+    logInfo("Starting Solve")
+    val solveStartTime = System.currentTimeMillis()
+    val featuresToMatrixCell = featurizedTrainData.zipWithIndex().flatMap {
       x => x._1.activeIterator.map {
         case (col, value) => (new MatrixIndexes(x._2 + 1, col + 1), new MatrixCell(value))
       }
@@ -69,8 +72,18 @@ object AmazonReviewsPipelineSystemML extends Logging {
     ml.registerInput("X", featuresMatrix, mc)
     ml.registerInput("y", labelsMatrix, labelsMC)
 
-    val nargs = Map("X" -> " ", "Y" -> " ", "B" -> "/Users/tomerk11/Desktop/bOut.mtx")
+    val nargs = Map(
+      "X" -> " ",
+      "Y" -> " ",
+      "B" -> "/Users/tomerk11/Desktop/bOut.mtx",
+      "reg" -> "0",
+      "tol" -> "0",
+      "maxi" -> s"${conf.numIters}")
     val outputs = ml.execute("/Users/tomerk11/Development/incubator-systemml/scripts/algorithms/LinearRegCG.dml", nargs)
+
+    val solveEndTime  = System.currentTimeMillis()
+
+    logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
 
   }
 
