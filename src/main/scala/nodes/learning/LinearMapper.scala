@@ -69,7 +69,7 @@ case class LinearMapper[T <: Vector[Double]](
  * @param lambda L2 Regularization parameter
  */
 case class LinearMapEstimator[T <: Vector[Double]](lambda: Option[Double] = None)
-    extends LabelEstimator[T, DenseVector[Double], DenseVector[Double]] {
+    extends SolverWithCostModel[T] {
 
   /**
    * Learns a linear model (OLS) based on training features and training labels.
@@ -102,6 +102,23 @@ case class LinearMapEstimator[T <: Vector[Double]](lambda: Option[Double] = None
     }
 
     LinearMapper(x, Some(labelScaler.mean), Some(featureScaler))
+  }
+
+  override def cost(
+     n: Long,
+     d: Int,
+     k: Int,
+     sparsity: Double,
+     numMachines: Int,
+     cpuWeight: Double,
+     memWeight: Double,
+     networkWeight: Double)
+  : Double = {
+    val flops = n.toDouble * d * (d + k) / numMachines.toDouble
+    val bytesScanned = n.toDouble * d / numMachines.toDouble + (d.toDouble * d)
+    val network = d.toDouble * (d + k)
+
+    math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network
   }
 }
 

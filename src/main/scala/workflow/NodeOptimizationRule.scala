@@ -36,11 +36,14 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
     val registers = new Array[InstructionOutput](instructions.length)
     val numPerPartitionPerNode = Array.fill[Option[Map[Int, Int]]](instructions.length)(None)
 
+    // Copy this value to avoid serializing the rule
+    val spp = samplePerPartition
+
     for ((instruction, index) <- instructions.zipWithIndex) {
       if (instructionsToExecute.contains(index)) {
         instruction match {
           case SourceNode(rdd) => {
-            val sampledRDD = rdd.mapPartitions(_.take(samplePerPartition))
+            val sampledRDD = rdd.mapPartitions(_.take(spp))
             registers(index) = RDDOutput(sampledRDD)
             numPerPartitionPerNode(index) = Some(WorkflowUtils.numPerPartition(rdd))
           }
