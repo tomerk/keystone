@@ -1,15 +1,10 @@
 package pipelines.speech
 
-import breeze.linalg.DenseVector
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
-import evaluation.MulticlassClassifierEvaluator
 import loaders.TimitFeaturesDataLoader
-import nodes.learning.BlockLeastSquaresEstimator
 import nodes.stats.{CosineRandomFeatures, StandardScaler}
-import nodes.util.{ClassLabelIndicatorsFromIntLabels, MaxClassifier}
 import org.apache.commons.math3.random.MersenneTwister
 import org.apache.hadoop.io.compress.GzipCodec
-import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
 import scopt.OptionParser
@@ -42,7 +37,6 @@ object VWTimitFeaturizer extends Logging {
 
     val numCosineFeatures = 4096
     val numCosineBatches = conf.numCosines
-    val colsPerBatch = numCosineFeatures + 1
 
     // Load the data
     val timitFeaturesData = TimitFeaturesDataLoader(
@@ -57,6 +51,7 @@ object VWTimitFeaturizer extends Logging {
     val trainDataAndLabels = timitFeaturesData.train.labels.zip(timitFeaturesData.train.data).repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
     val trainLabels = trainDataAndLabels.map(_._1)
+    trainData.count()
 
     val featurizer = if (conf.rfType == Distributions.Cauchy) {
       // TODO: Once https://github.com/scalanlp/breeze/issues/398 is released,
@@ -74,7 +69,7 @@ object VWTimitFeaturizer extends Logging {
         conf.gamma,
         randomSource.gaussian,
         randomSource.uniform)
-    } andThen (new StandardScaler(), trainData)
+    } andThen (new StandardScaler(normalizeStdDev = false), trainData)
 
     val vwTrainingFeatures = featurizer.apply(trainData)
     val vwTrainData = trainLabels.zip(vwTrainingFeatures).map {
