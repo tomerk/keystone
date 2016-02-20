@@ -71,7 +71,7 @@ object VWTimitFeaturizer extends Logging {
         conf.gamma,
         randomSource.gaussian,
         randomSource.uniform)
-    } andThen (new StandardScaler(normalizeStdDev = false), trainData) andThen Transformer(x => x.padTo(x.length + 1, 1))
+    } andThen (new StandardScaler(normalizeStdDev = false), trainData) andThen Transformer(x => x.padTo(x.length + 1, .006802721))
 
     val vwTrainingFeatures = featurizer.apply(trainData)
     val vwTrainData = trainLabels.zip(vwTrainingFeatures).map {
