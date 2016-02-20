@@ -1,5 +1,6 @@
 package pipelines.speech
 
+import breeze.linalg.DenseVector
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
 import loaders.TimitFeaturesDataLoader
 import nodes.stats.{CosineRandomFeatures, StandardScaler}
@@ -8,6 +9,7 @@ import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
 import scopt.OptionParser
+import workflow.Transformer
 
 
 object VWTimitFeaturizer extends Logging {
@@ -69,7 +71,7 @@ object VWTimitFeaturizer extends Logging {
         conf.gamma,
         randomSource.gaussian,
         randomSource.uniform)
-    } andThen (new StandardScaler(normalizeStdDev = false), trainData)
+    } andThen (new StandardScaler(normalizeStdDev = false), trainData) andThen Transformer(x => x.padTo(x.length + 1, 1))
 
     val vwTrainingFeatures = featurizer.apply(trainData)
     val vwTrainData = trainLabels.zip(vwTrainingFeatures).map {
@@ -133,6 +135,7 @@ object VWTimitFeaturizer extends Logging {
 
   /**
    * The actual driver receives its configuration parameters from spark-submit usually.
+   *
    * @param args
    */
   def main(args: Array[String]) = {
