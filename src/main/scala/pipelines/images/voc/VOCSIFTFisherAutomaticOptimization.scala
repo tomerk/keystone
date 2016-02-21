@@ -91,7 +91,8 @@ object VOCSIFTFisherAutomaticOptimization extends Serializable with Logging {
     }
 
     logInfo("PIPELINE TIMING: Starting whole pipeline optimization")
-    wholePipelineOptimizer.execute(predictor)
+    val wholeOptimizedPipeline = wholePipelineOptimizer.execute(predictor)
+    logInfo(wholeOptimizedPipeline.toDOTString)
     logInfo("PIPELINE TIMING: Finished whole pipeline optimization")
 
     val fullOptimizer = new Optimizer {
@@ -103,7 +104,8 @@ object VOCSIFTFisherAutomaticOptimization extends Serializable with Logging {
     }
 
     logInfo("PIPELINE TIMING: Starting ALL optimization")
-    fullOptimizer.execute(predictor)
+    val allOptimized = fullOptimizer.execute(predictor)
+    logInfo(allOptimized.toDOTString)
     logInfo("PIPELINE TIMING: Finished ALL optimization")
   }
 
