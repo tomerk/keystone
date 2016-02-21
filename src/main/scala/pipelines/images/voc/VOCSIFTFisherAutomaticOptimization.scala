@@ -19,7 +19,7 @@ import workflow.AutoCacheRule.GreedyCache
 import workflow.{NodeOptimizationRule, AutoCacheRule, EquivalentNodeMergeRule, Optimizer}
 
 object VOCSIFTFisherAutomaticOptimization extends Serializable with Logging {
-  val appName = "VOCSIFTFisher"
+  val appName = "VOCSIFTFisherAutomaticOptimization"
 
   def run(sc: SparkContext, conf: SIFTFisherConfig) {
 

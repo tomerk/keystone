@@ -12,7 +12,7 @@ import workflow.AutoCacheRule.GreedyCache
 import workflow.{NodeOptimizationRule, AutoCacheRule, EquivalentNodeMergeRule, Optimizer}
 
 object AmazonReviewsPipelineAutomaticOptimization extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipelineAutomaticOptimization"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
     val amazonTrainData = AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData

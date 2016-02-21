@@ -16,7 +16,7 @@ import workflow._
 
 
 object TimitPipelineAutomaticOptimization extends Logging {
-  val appName = "Timit"
+  val appName = "TimitPipelineAutomaticOptimization"
 
   case class TimitConfig(
     trainDataLocation: String = "",
