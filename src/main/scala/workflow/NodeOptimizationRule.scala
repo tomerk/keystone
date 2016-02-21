@@ -1,14 +1,16 @@
 package workflow
 
 import org.apache.spark.rdd.RDD
+import pipelines.Logging
 
 /**
  * Node-level optimization, such as selecting a Linear Solver
  *
  * @param samplePerPartition The number per partition of the RDD to use for operations
  */
-class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends Rule {
+class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends Rule with Logging {
   override def apply[A, B](plan: Pipeline[A, B]): Pipeline[A, B] = {
+    logInfo("Optimization Timing: Started NodeOptimizationRule")
     val instructions = WorkflowUtils.pipelineToInstructions(plan)
 
     // First, figure out which instructions we should actually execute.
@@ -104,6 +106,8 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
       case _ => Unit
     }
 
-    WorkflowUtils.instructionsToPipeline(optimizedInstructions)
+    val outPipe = WorkflowUtils.instructionsToPipeline[A, B](optimizedInstructions)
+    logInfo("Optimization Timing: Finished NodeOptimizationRule")
+    outPipe
   }
 }

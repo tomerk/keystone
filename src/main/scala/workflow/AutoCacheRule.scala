@@ -480,9 +480,11 @@ class AutoCacheRule(cachingMode: CachingStrategy) extends Rule with Logging {
   }
 
   override def apply[A, B](plan: Pipeline[A, B]): Pipeline[A, B] = {
+    logInfo("Optimization Timing: Started AutoCacheRule")
+
     val instructions = WorkflowUtils.pipelineToInstructions(plan)
 
-    WorkflowUtils.instructionsToPipeline(cachingMode match {
+    val outPipe = WorkflowUtils.instructionsToPipeline[A, B](cachingMode match {
       case AggressiveCache => aggressiveCache(instructions)
       case GreedyCache(maxMem, profileScales, numProfileTrials) => {
         logInfo("Starting pipeline profile")
@@ -501,6 +503,9 @@ class AutoCacheRule(cachingMode: CachingStrategy) extends Rule with Logging {
         cachedInstructions
       }
     })
+
+    logInfo("Optimization Timing: Finished AutoCacheRule")
+    outPipe
   }
 }
 

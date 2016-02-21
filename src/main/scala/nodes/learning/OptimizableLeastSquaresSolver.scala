@@ -35,8 +35,11 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
     val sparsity = sample.map(x => x.activeSize / x.length).sum() / sample.count()
 
     val realNumMachines = numMachines.getOrElse {
-      // TODO: This may count the driver in cluster mode, in which case we need to subtract one (but not in local mode)
-      sample.sparkContext.getExecutorStorageStatus.length
+      if (sample.sparkContext.getExecutorStorageStatus.length == 1) {
+        1
+      } else {
+        sample.sparkContext.getExecutorStorageStatus.length
+      }
     }
 
     options.minBy(_.cost(n, d, k, sparsity, realNumMachines, cpuWeight, memWeight, networkWeight))
