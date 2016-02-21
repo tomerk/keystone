@@ -2,7 +2,7 @@ package nodes.learning
 
 import breeze.linalg._
 import org.apache.spark.rdd.RDD
-import workflow.{LabelEstimator, OptimizableLabelEstimator}
+import workflow.{WeightedNode, LabelEstimator, OptimizableLabelEstimator}
 
 import scala.reflect._
 
@@ -13,7 +13,7 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
                                                                     cpuWeight: Double = 0.2,
                                                                     memWeight: Double = 0.0833,
                                                                     networkWeight: Double = 8.33)
-  extends OptimizableLabelEstimator[T, DenseVector[Double], DenseVector[Double]] {
+  extends OptimizableLabelEstimator[T, DenseVector[Double], DenseVector[Double]] with WeightedNode {
 
   val options: Seq[SolverWithCostModel[T]] = Seq(
     LeastSquaresSparseLBFGSwithL2(regParam = lambda, numIterations = 20),
@@ -44,4 +44,6 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
 
     options.minBy(_.cost(n, d, k, sparsity, realNumMachines, cpuWeight, memWeight, networkWeight))
   }
+
+  override val weight: Int = 21 // The weight of the default lbfgs node
 }

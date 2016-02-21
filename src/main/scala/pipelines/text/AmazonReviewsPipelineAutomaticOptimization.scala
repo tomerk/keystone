@@ -1,10 +1,11 @@
 package pipelines.text
 
+import breeze.linalg.SparseVector
 import loaders.{AmazonReviewsDataLoader, LabeledData}
-import nodes.learning.LogisticRegressionEstimator
+import nodes.learning.{OptimizableLeastSquaresSolver, LogisticRegressionEstimator}
 import nodes.nlp._
 import nodes.stats.TermFrequency
-import nodes.util.CommonSparseFeatures
+import nodes.util.{ClassLabelIndicatorsFromIntLabels, CommonSparseFeatures}
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines.Logging
 import scopt.OptionParser
@@ -19,7 +20,7 @@ object AmazonReviewsPipelineAutomaticOptimization extends Logging {
     val trainData = LabeledData(amazonTrainData.repartition(conf.numParts).cache())
 
     val training = trainData.data
-    val labels = trainData.labels
+    val labels = ClassLabelIndicatorsFromIntLabels(2).apply(trainData.labels, None)
 
     training.count()
 
@@ -30,7 +31,7 @@ object AmazonReviewsPipelineAutomaticOptimization extends Logging {
         NGramsFeaturizer(1 to conf.nGrams) andThen
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training) andThen
-        (LogisticRegressionEstimator(numClasses = 2, numIters = conf.numIters), training, labels)
+        (new OptimizableLeastSquaresSolver[SparseVector[Double]](), training, labels)
 
     val wholePipelineOptimizer = new Optimizer {
       protected val batches: Seq[Batch] =
