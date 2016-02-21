@@ -42,7 +42,7 @@ object TimitPipelineAutomaticOptimization extends Logging {
     val random = new java.util.Random(seed)
     val randomSource = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(random.nextLong())))
 
-    val numCosineFeatures = 4096
+    val numCosineFeatures = 1024
     val numCosineBatches = conf.numCosines
     val colsPerBatch = numCosineFeatures + 1
 
