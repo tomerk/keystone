@@ -2,6 +2,7 @@ package nodes.learning
 
 import breeze.linalg._
 import org.apache.spark.rdd.RDD
+import pipelines.Logging
 import workflow.{WeightedNode, LabelEstimator, OptimizableLabelEstimator}
 
 import scala.reflect._
@@ -13,7 +14,7 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
                                                                     cpuWeight: Double = 0.2,
                                                                     memWeight: Double = 0.0833,
                                                                     networkWeight: Double = 8.33)
-  extends OptimizableLabelEstimator[T, DenseVector[Double], DenseVector[Double]] with WeightedNode {
+  extends OptimizableLabelEstimator[T, DenseVector[Double], DenseVector[Double]] with WeightedNode with Logging {
 
   val options: Seq[SolverWithCostModel[T]] = Seq(
     LeastSquaresSparseLBFGSwithL2(regParam = lambda, numIterations = 20),
@@ -38,10 +39,15 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
       if (sample.sparkContext.getExecutorStorageStatus.length == 1) {
         1
       } else {
-        sample.sparkContext.getExecutorStorageStatus.length
+        sample.sparkContext.getExecutorStorageStatus.length - 1
       }
     }
 
+    logInfo(s"Optimizable Param n is $n")
+    logInfo(s"Optimizable Param d is $d")
+    logInfo(s"Optimizable Param k is $k")
+    logInfo(s"Optimizable Param sparsity is $sparsity")
+    logInfo(s"Optimizable Param numMachines is $realNumMachines")
     options.minBy(_.cost(n, d, k, sparsity, realNumMachines, cpuWeight, memWeight, networkWeight))
   }
 
