@@ -11,7 +11,6 @@ import pipelines.Logging
 class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends Rule with Logging {
   override def apply[A, B](plan: Pipeline[A, B]): Pipeline[A, B] = {
     logInfo("Optimization Timing: Started NodeOptimizationRule")
-    logInfo(plan.toDOTString)
     val instructions = WorkflowUtils.pipelineToInstructions(plan)
 
     // First, figure out which instructions we should actually execute.
@@ -65,12 +64,12 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
             // Optimize the transformer if possible
             val transformer = registers(tIndex) match {
               case TransformerOutput(ot: OptimizableTransformer[a, b]) =>
-                ot.optimize(inputs.head.asInstanceOf[RDD[a]], numPerPartition.get)
+                val optTransformer = ot.optimize(inputs.head.asInstanceOf[RDD[a]], numPerPartition.get)
+                optimizedInstructions(tIndex) = optTransformer
+                optTransformer
               case TransformerOutput(t) => t
               case _ => throw new ClassCastException("TransformerApplyNode dep wasn't pointing at a transformer")
             }
-
-            optimizedInstructions(tIndex) = transformer
 
             if (instructionsToExecute.contains(index)) {
               numPerPartitionPerNode(index) = numPerPartition
@@ -119,7 +118,6 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
 
     val outPipe = WorkflowUtils.instructionsToPipeline[A, B](optimizedInstructions)
     logInfo("Optimization Timing: Finished NodeOptimizationRule")
-    logInfo(outPipe.toDOTString)
     outPipe
   }
 }
