@@ -34,7 +34,7 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
     }.reduce(_ union _ ) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions)
 
     val instructionsToExecute = instructionsToOptimize.flatMap {
-      index => WorkflowUtils.getParents(index, instructions) + index
+      index => WorkflowUtils.getParents(index, instructions)
     }
 
     // Execute the minimal amount necessary of the pipeline on sampled nodes, and optimize the optimizable nodes
