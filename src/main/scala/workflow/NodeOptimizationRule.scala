@@ -16,22 +16,26 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
     // First, figure out which instructions we should actually execute.
     // Take the set of all instructions that are parents of an optimizable node transform or fit instruction.
     // And, keep those that do not depend on the runtime input of a fit pipeline
-    val instructionsToExecute = instructions.zipWithIndex.map {
+    val instructionsToOptimize = instructions.zipWithIndex.map {
       case (TransformerApplyNode(tIndex, _), index) =>
         instructions(tIndex) match {
-          case _: OptimizableTransformer[_, _] => WorkflowUtils.getParents(index, instructions) + index
+          case _: OptimizableTransformer[_, _] => Set(index)
           case _ => Set[Int]()
         }
 
       case (EstimatorFitNode(estIndex, _), index) =>
         instructions(estIndex) match {
-          case _: OptimizableEstimator[_, _] => WorkflowUtils.getParents(index, instructions) + index
-          case _: OptimizableLabelEstimator[_, _, _] => WorkflowUtils.getParents(index, instructions) + index
+          case _: OptimizableEstimator[_, _] => Set(index)
+          case _: OptimizableLabelEstimator[_, _, _] => Set(index)
           case _ => Set[Int]()
         }
 
       case _ => Set[Int]()
-    }.reduce(_ union _) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions) - Pipeline.SOURCE
+    }.reduce(_ union _ ) -- WorkflowUtils.getChildren(Pipeline.SOURCE, instructions)
+
+    val instructionsToExecute = instructionsToOptimize.flatMap {
+      index => WorkflowUtils.getParents(index, instructions) + index
+    }
 
     // Execute the minimal amount necessary of the pipeline on sampled nodes, and optimize the optimizable nodes
     val optimizedInstructions = instructions.toArray
@@ -42,7 +46,7 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
     val spp = samplePerPartition
 
     for ((instruction, index) <- instructions.zipWithIndex) {
-      if (instructionsToExecute.contains(index)) {
+      if (instructionsToExecute.contains(index) || instructionsToOptimize.contains(index)) {
         instruction match {
           case SourceNode(rdd) => {
             val sampledRDD = rdd.mapPartitions(_.take(spp))
@@ -65,9 +69,12 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
               case _ => throw new ClassCastException("TransformerApplyNode dep wasn't pointing at a transformer")
             }
 
-            registers(index) = RDDOutput(transformer.transformRDD(inputs))
             optimizedInstructions(tIndex) = transformer
-            numPerPartitionPerNode(index) = numPerPartition
+
+            if (instructionsToExecute.contains(index)) {
+              numPerPartitionPerNode(index) = numPerPartition
+              registers(index) = RDDOutput(transformer.transformRDD(inputs))
+            }
           }
 
           case EstimatorFitNode(estIndex, inputIndices) => {
@@ -87,9 +94,12 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
               case _ => throw new ClassCastException("EstimatorFitNode dep wasn't pointing at an estimator")
             }
 
-            registers(index) = TransformerOutput(estimator.fitRDDs(inputs))
             optimizedInstructions(estIndex) = estimator
-            numPerPartitionPerNode(index) = numPerPartition
+
+            if (instructionsToExecute.contains(index)) {
+              registers(index) = TransformerOutput(estimator.fitRDDs(inputs))
+              numPerPartitionPerNode(index) = numPerPartition
+            }
           }
 
           case node: Instruction => {
