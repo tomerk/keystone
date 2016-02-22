@@ -75,11 +75,11 @@ object AmazonReviewsPipelineSystemML extends Logging {
     val nargs = Map(
       "X" -> " ",
       "Y" -> " ",
-      "B" -> "/Users/tomerk11/Desktop/bOut.mtx",
+      "B" -> conf.bOutLocation,
       "reg" -> "0",
       "tol" -> "0",
       "maxi" -> s"${conf.numIters}")
-    val outputs = ml.execute("/Users/tomerk11/Development/incubator-systemml/scripts/algorithms/LinearRegCG.dml", nargs)
+    val outputs = ml.execute(conf.scriptLocation, nargs)
 
     val solveEndTime  = System.currentTimeMillis()
 
@@ -90,6 +90,8 @@ object AmazonReviewsPipelineSystemML extends Logging {
   case class AmazonReviewsConfig(
     trainLocation: String = "",
     testLocation: String = "",
+    scriptLocation: String = "",
+    bOutLocation: String = "",
     threshold: Double = 3.5,
     nGrams: Int = 2,
     commonFeatures: Int = 100000,
@@ -100,6 +102,8 @@ object AmazonReviewsPipelineSystemML extends Logging {
     head(appName, "0.1")
     opt[String]("trainLocation") required() action { (x,c) => c.copy(trainLocation=x) }
     opt[String]("testLocation") required() action { (x,c) => c.copy(testLocation=x) }
+    opt[String]("scriptLocation") required() action { (x,c) => c.copy(scriptLocation=x) }
+    opt[String]("bOutLocation") required() action { (x,c) => c.copy(bOutLocation=x) }
     opt[Double]("threshold") action { (x,c) => c.copy(threshold=x)}
     opt[Int]("nGrams") action { (x,c) => c.copy(nGrams=x) }
     opt[Int]("commonFeatures") action { (x,c) => c.copy(commonFeatures=x) }

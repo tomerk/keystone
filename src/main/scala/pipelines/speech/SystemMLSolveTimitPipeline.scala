@@ -25,6 +25,8 @@ object SystemMLSolveTimitPipeline extends Logging {
     trainLabelsLocation: String = "",
     testDataLocation: String = "",
     testLabelsLocation: String = "",
+    scriptLocation: String = "",
+    bOutLocation: String = "",
     numParts: Int = 512,
     numCosines: Int = 50,
     gamma: Double = 0.05555,
@@ -120,11 +122,11 @@ object SystemMLSolveTimitPipeline extends Logging {
     val nargs = Map(
       "X" -> " ",
       "Y" -> " ",
-      "B" -> "/Users/tomerk11/Desktop/bOut.mtx",
+      "B" -> conf.bOutLocation,
       "reg" -> "0",
       "tol" -> "0",
       "maxi" -> s"${conf.numEpochs}")
-    val outputs = ml.execute("/Users/tomerk11/Development/incubator-systemml/scripts/algorithms/LinearRegCG.dml", nargs)
+    val outputs = ml.execute(conf.scriptLocation, nargs)
 
     val solveEndTime  = System.currentTimeMillis()
 
@@ -157,6 +159,8 @@ object SystemMLSolveTimitPipeline extends Logging {
     opt[String]("trainLabelsLocation") required() action { (x,c) => c.copy(trainLabelsLocation=x) }
     opt[String]("testDataLocation") required() action { (x,c) => c.copy(testDataLocation=x) }
     opt[String]("testLabelsLocation") required() action { (x,c) => c.copy(testLabelsLocation=x) }
+    opt[String]("scriptLocation") required() action { (x,c) => c.copy(scriptLocation=x) }
+    opt[String]("bOutLocation") required() action { (x,c) => c.copy(bOutLocation=x) }
     opt[String]("checkpointDir") action { (x,c) => c.copy(checkpointDir=Some(x)) }
     opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
     opt[Int]("numCosines") action { (x,c) => c.copy(numCosines=x) }
