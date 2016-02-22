@@ -7,7 +7,7 @@ import breeze.stats._
 import evaluation.MeanAveragePrecisionEvaluator
 import loaders.{VOCDataPath, VOCLabelPath, VOCLoader}
 import nodes.images.external.{FisherVector, GMMFisherVectorEstimator, SIFTExtractor}
-import nodes.images.{GrayScaler, MultiLabelExtractor, MultiLabeledImageExtractor, PixelScaler}
+import nodes.images._
 import nodes.learning._
 import nodes.stats.{ColumnSampler, NormalizeRows, SignedHellingerMapper}
 import nodes.util.{ClassLabelIndicatorsFromIntArrayLabels, FloatToDouble, MatrixVectorizer}
@@ -68,7 +68,7 @@ object VOCSIFTFisherAutomaticOptimization extends Serializable with Logging {
       case None =>
         val fisherVector = pcaFeaturizer andThen
             ColumnSampler(numGMMSamplesPerImage) andThen
-            (GMMFisherVectorEstimator(conf.vocabSize), trainingData)
+            (OptimizableGMMFisherVectorEstimator(conf.vocabSize), trainingData)
         pcaFeaturizer andThen fisherVector.fittedTransformer
     }) andThen
         FloatToDouble andThen

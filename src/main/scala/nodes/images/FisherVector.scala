@@ -3,8 +3,10 @@ package nodes.images
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats.mean
-import nodes.learning.GaussianMixtureModel
-import workflow.Transformer
+import nodes.learning.{GaussianMixtureModelEstimator, GaussianMixtureModel}
+import org.apache.spark.rdd.RDD
+import utils.MatrixUtils
+import workflow.{OptimizableEstimator, Estimator, Transformer}
 
 /**
  * Abstract interface for Fisher Vector.
@@ -47,5 +49,26 @@ case class FisherVector(gmm: GaussianMixtureModel)
 
     // concatenate the two fv terms
     convert(DenseMatrix.horzcat(fv1, fv2), Float)
+  }
+}
+
+case class GMMFisherVectorEstimator(k: Int) extends Estimator[DenseMatrix[Float], DenseMatrix[Float]] {
+  protected def fit(data: RDD[DenseMatrix[Float]]): FisherVector = {
+    val gmmTrainingData = data.flatMap(x => convert(MatrixUtils.matrixToColArray(x), Double))
+    val gmmEst = new GaussianMixtureModelEstimator(k)
+    val gmm = gmmEst.fit(gmmTrainingData)
+    FisherVector(gmm)
+  }
+}
+
+case class OptimizableGMMFisherVectorEstimator(k: Int) extends OptimizableEstimator[DenseMatrix[Float], DenseMatrix[Float]] {
+  val default = GMMFisherVectorEstimator(k)
+
+  override def optimize(sample: RDD[DenseMatrix[Float]], numPerPartition: Map[Int, Int]): Estimator[DenseMatrix[Float], DenseMatrix[Float]] = {
+    if (k > 16) {
+      nodes.images.external.GMMFisherVectorEstimator(k)
+    } else {
+      GMMFisherVectorEstimator(k)
+    }
   }
 }
