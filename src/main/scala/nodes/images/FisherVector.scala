@@ -65,7 +65,7 @@ case class OptimizableGMMFisherVectorEstimator(k: Int) extends OptimizableEstima
   val default = GMMFisherVectorEstimator(k)
 
   override def optimize(sample: RDD[DenseMatrix[Float]], numPerPartition: Map[Int, Int]): Estimator[DenseMatrix[Float], DenseMatrix[Float]] = {
-    if (k > 16) {
+    if (k >= 32) {
       nodes.images.external.GMMFisherVectorEstimator(k)
     } else {
       GMMFisherVectorEstimator(k)

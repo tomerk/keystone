@@ -51,7 +51,7 @@ object VOCSIFTFisherAutomaticOptimization extends Serializable with Logging {
       case None =>
         val pca = siftExtractor andThen
             ColumnSampler(numPCASamplesPerImage) andThen
-            (ColumnPCAEstimator(conf.descDim), trainingData)
+            (new OptimizableColumnPCAEstimator(conf.descDim), trainingData)
 
         siftExtractor andThen pca.fittedTransformer
     })

@@ -8,7 +8,7 @@ import org.apache.spark.rdd.RDD
 import org.netlib.util.intW
 import pipelines._
 import utils.MatrixUtils
-import workflow.{Transformer, Estimator}
+import workflow.{OptimizableEstimator, Transformer, Estimator}
 
 
 /**
@@ -51,6 +51,27 @@ case class ColumnPCAEstimator(dims: Int) extends Estimator[DenseMatrix[Float], D
   protected def fit(data: RDD[DenseMatrix[Float]]): Transformer[DenseMatrix[Float], DenseMatrix[Float]] = {
     val singleTransformer = new PCAEstimator(dims).fit(data.flatMap(x => MatrixUtils.matrixToColArray(x)))
     BatchPCATransformer(singleTransformer.pcaMat)
+  }
+}
+
+case class DistributedColumnPCAEstimator(dims: Int) extends Estimator[DenseMatrix[Float], DenseMatrix[Float]] {
+  protected def fit(data: RDD[DenseMatrix[Float]]): Transformer[DenseMatrix[Float], DenseMatrix[Float]] = {
+    val singleTransformer = new DistributedPCAEstimator(dims).fit(data.flatMap(x => MatrixUtils.matrixToColArray(x)))
+    BatchPCATransformer(singleTransformer.pcaMat)
+  }
+}
+
+class OptimizableColumnPCAEstimator(dims: Int) extends OptimizableEstimator[DenseMatrix[Float], DenseMatrix[Float]] {
+  val default = new DistributedColumnPCAEstimator(dims)
+
+  override def optimize(sample: RDD[DenseMatrix[Float]], numPerPartition: Map[Int, Int]): Estimator[DenseMatrix[Float], DenseMatrix[Float]] = {
+    val numFeatures = sample.first().rows
+
+    if (numFeatures <= 100000) {
+      new ColumnPCAEstimator(dims)
+    } else {
+      default
+    }
   }
 }
 
