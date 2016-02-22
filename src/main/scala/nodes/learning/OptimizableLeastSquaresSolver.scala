@@ -33,7 +33,7 @@ class OptimizableLeastSquaresSolver[T <: Vector[Double]: ClassTag](
     val n = numPerPartition.values.map(_.toLong).sum
     val d = sample.first().length
     val k = sampleLabels.first().length
-    val sparsity = sample.map(x => x.activeSize / x.length).sum() / sample.count()
+    val sparsity = sample.map(x => x.activeSize.toDouble / x.length).sum() / sample.count()
 
     val realNumMachines = numMachines.getOrElse {
       if (sample.sparkContext.getExecutorStorageStatus.length == 1) {
