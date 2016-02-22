@@ -50,8 +50,8 @@ object AmazonReviewsPipelineSystemML extends Logging {
 
     val numRows = training.count()
     val numCols = conf.commonFeatures
-    val numRowsPerBlock = 1000
-    val numColsPerBlock = 1000
+    val numRowsPerBlock = 1024
+    val numColsPerBlock = 1024
 
     val mc = new MatrixCharacteristics(numRows, numCols, numRowsPerBlock, numColsPerBlock)
     val labelsMC = new MatrixCharacteristics(numRows, 1, numRowsPerBlock, 1)
@@ -60,13 +60,13 @@ object AmazonReviewsPipelineSystemML extends Logging {
       new JavaSparkContext(sc),
       new JavaPairRDD(featuresToMatrixCell),
       mc,
-      false)
+      false).cache()
 
     val labelsMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
       new JavaSparkContext(sc),
       new JavaPairRDD(labelsToMatrixCell),
       labelsMC,
-      false)
+      false).cache()
 
     ml.reset()
     ml.registerInput("X", featuresMatrix, mc)
