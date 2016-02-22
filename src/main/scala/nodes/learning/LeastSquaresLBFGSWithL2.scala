@@ -1,6 +1,7 @@
 package nodes.learning
 
 import breeze.linalg.Vector
+import workflow.WeightedNode
 
 /**
  * Solve Least Squares with L2 loss using Sparse LBFGS
@@ -20,7 +21,7 @@ case class LeastSquaresSparseLBFGSwithL2[T <: Vector[Double]](
      override val numIterations: Int = 100,
      override val regParam: Double = 0.0,
      sparseOverhead: Double = 8)
-  extends SparseLBFGSwithL2[T](new LeastSquaresSparseGradient) with SolverWithCostModel[T] {
+  extends SparseLBFGSwithL2[T](new LeastSquaresSparseGradient) with SolverWithCostModel[T] with WeightedNode {
 
   override def cost(
      n: Long,
@@ -39,6 +40,8 @@ case class LeastSquaresSparseLBFGSwithL2[T <: Vector[Double]](
     numIterations *
       (sparseOverhead * math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network)
   }
+
+  override val weight: Int = numIterations + 1
 }
 
 /**
@@ -57,7 +60,7 @@ case class LeastSquaresDenseLBFGSwithL2[T <: Vector[Double]](
     override val convergenceTol: Double = 1e-4,
     override val numIterations: Int = 100,
     override val regParam: Double = 0.0)
-  extends DenseLBFGSwithL2[T](new LeastSquaresDenseGradient) with SolverWithCostModel[T] {
+  extends DenseLBFGSwithL2[T](new LeastSquaresDenseGradient) with SolverWithCostModel[T] with WeightedNode {
 
   override def cost(
                      n: Long,
@@ -76,4 +79,6 @@ case class LeastSquaresDenseLBFGSwithL2[T <: Vector[Double]](
     numIterations *
       (math.max(cpuWeight * flops, memWeight * bytesScanned) + networkWeight * network)
   }
+
+  override val weight: Int = numIterations + 1
 }
