@@ -11,6 +11,7 @@ import pipelines.Logging
 class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends Rule with Logging {
   override def apply[A, B](plan: Pipeline[A, B]): Pipeline[A, B] = {
     logInfo("Optimization Timing: Started NodeOptimizationRule")
+    logInfo(plan.toDOTString)
     val instructions = WorkflowUtils.pipelineToInstructions(plan)
 
     // First, figure out which instructions we should actually execute.
@@ -118,6 +119,7 @@ class NodeOptimizationRule(samplePerPartition: Int = 3, seed: Long = 0) extends 
 
     val outPipe = WorkflowUtils.instructionsToPipeline[A, B](optimizedInstructions)
     logInfo("Optimization Timing: Finished NodeOptimizationRule")
+    logInfo(outPipe.toDOTString)
     outPipe
   }
 }
