@@ -1,6 +1,8 @@
 package pipelines.text
 
+import breeze.linalg.{SparseVector, DenseMatrix}
 import loaders.{AmazonReviewsDataLoader, LabeledData}
+import nodes.learning.SystemMLLinearReg
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.CommonSparseFeatures
@@ -20,8 +22,9 @@ object AmazonReviewsPipelineSystemML extends Logging {
     logInfo("PIPELINE TIMING: Started training the classifier")
     val trainData = LabeledData(AmazonReviewsDataLoader(sc, conf.trainLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
 
+    trainData.data.count()
     val training = trainData.data
-    val labels = trainData.labels
+    val labels = trainData.labels.map(_ > 0)
 
     // Build the classifier estimator
     logInfo("Training classifier")
@@ -36,51 +39,8 @@ object AmazonReviewsPipelineSystemML extends Logging {
 
     logInfo("Starting Solve")
     val solveStartTime = System.currentTimeMillis()
-    val featuresToMatrixCell = featurizedTrainData.zipWithIndex().flatMap {
-      x => x._1.activeIterator.map {
-        case (col, value) => (new MatrixIndexes(x._2 + 1, col + 1), new MatrixCell(value))
-      }
-    }
-
-    val labelsToMatrixCell = trainData.labels.map(i => if (i > 0) 1 else -1).zipWithIndex().map {
-      x => (new MatrixIndexes(x._2 + 1, 1), new MatrixCell(x._1))
-    }
-
-    val ml = new MLContext(sc)
-
-    val numRows = training.count()
-    val numCols = conf.commonFeatures
-    val numRowsPerBlock = 1024
-    val numColsPerBlock = 1024
-
-    val mc = new MatrixCharacteristics(numRows, numCols, numRowsPerBlock, numColsPerBlock)
-    val labelsMC = new MatrixCharacteristics(numRows, 1, numRowsPerBlock, 1)
-
-    val featuresMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
-      new JavaSparkContext(sc),
-      new JavaPairRDD(featuresToMatrixCell),
-      mc,
-      false).cache()
-
-    val labelsMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
-      new JavaSparkContext(sc),
-      new JavaPairRDD(labelsToMatrixCell),
-      labelsMC,
-      false).cache()
-
-    ml.reset()
-    ml.registerInput("X", featuresMatrix, mc)
-    ml.registerInput("y", labelsMatrix, labelsMC)
-
-    val nargs = Map(
-      "X" -> " ",
-      "Y" -> " ",
-      "B" -> conf.bOutLocation,
-      "reg" -> "0",
-      "tol" -> "0",
-      "maxi" -> s"${conf.numIters}")
-    val outputs = ml.execute(conf.scriptLocation, nargs)
-
+    val solver = new SystemMLLinearReg[SparseVector[Double]](conf.scriptLocation, conf.commonFeatures, conf.numIters)
+    solver.fit(featurizedTrainData, labels)
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
@@ -94,9 +54,9 @@ object AmazonReviewsPipelineSystemML extends Logging {
     bOutLocation: String = "",
     threshold: Double = 3.5,
     nGrams: Int = 2,
-    commonFeatures: Int = 100000,
-    numIters: Int = 20,
-    numParts: Int = 512)
+    commonFeatures: Int = 1024,
+    numIters: Int = 1,
+    numParts: Int = 16)
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
@@ -118,7 +78,7 @@ object AmazonReviewsPipelineSystemML extends Logging {
    */
   def main(args: Array[String]) = {
     val conf = new SparkConf().setAppName(appName)
-    conf.setIfMissing("spark.master", "local[2]") // This is a fallback if things aren't set via spark submit.
+    conf.setIfMissing("spark.master", "local[4]") // This is a fallback if things aren't set via spark submit.
 
     val sc = new SparkContext(conf)
 
