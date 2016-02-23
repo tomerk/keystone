@@ -8,13 +8,14 @@ import org.apache.sysml.api.MLContext
 import org.apache.sysml.runtime.instructions.spark.utils.RDDConverterUtils
 import org.apache.sysml.runtime.matrix.MatrixCharacteristics
 import org.apache.sysml.runtime.matrix.data.{MatrixCell, MatrixIndexes}
+import pipelines.Logging
 import utils.MatrixUtils
 import workflow.{Transformer, LabelEstimator}
 
 /**
  * Created by tomerk11 on 2/22/16.
  */
-class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures: Int, numIters: Double, blockSize: Int = 1024) extends LabelEstimator[T, Boolean, Boolean] {
+class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures: Int, numIters: Double, blockSize: Int = 1024) extends LabelEstimator[T, Boolean, Boolean] with Logging {
   /**
    * A LabelEstimator estimator is an estimator which expects labeled data.
    *
@@ -23,6 +24,8 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
    * @return A [[Transformer]] which can be called on new data.
    */
   override def fit(data: RDD[T], labels: RDD[Boolean]): BooleanLinearMapper[T] = {
+    val startConversionTime = System.currentTimeMillis()
+
     val featuresToMatrixCell = data.zipWithIndex().flatMap {
       x => x._1.activeIterator.map {
         case (col, value) => (new MatrixIndexes(x._2 + 1, col + 1), new MatrixCell(value))
@@ -53,6 +56,11 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
       new JavaPairRDD(labelsToMatrixCell),
       labelsMC,
       false).cache()
+
+    featuresMatrix.count()
+    labelsMatrix.count()
+    val endConversionTime = System.currentTimeMillis()
+    logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
     ml.reset()
     ml.setConfig("defaultblocksize", s"$blockSize")

@@ -1,14 +1,13 @@
-package pipelines.text
+package pipelines.speech
 
 import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
 import loaders.TimitFeaturesDataLoader
 import org.apache.spark.{SparkConf, SparkContext}
 import pipelines._
-import pipelines.text.AmazonReviewsVWPreprocessor._
 import scopt.OptionParser
 
 
-object VWAmazonReviewsEval extends Logging {
+object VWBinaryTimitEval extends Logging {
   val appName = "VW Timit Eval"
 
   case class TimitConfig(
@@ -27,7 +26,6 @@ object VWAmazonReviewsEval extends Logging {
 
     logInfo("\n" + eval.summary())
     logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
-
   }
 
   def parse(args: Array[String]): TimitConfig = new OptionParser[TimitConfig](appName) {
@@ -46,9 +44,6 @@ object VWAmazonReviewsEval extends Logging {
     val appConfig = parse(args)
 
     val conf = new SparkConf().setAppName(appName)
-    // NOTE: ONLY APPLICABLE IF YOU CAN DONE COPY-DIR
-    conf.remove("spark.jars")
-
     conf.setIfMissing("spark.master", "local[2]")
 
     val sc = new SparkContext(conf)

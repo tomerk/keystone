@@ -50,6 +50,8 @@ object AmazonExactSolvePipeline extends Logging {
     val eval = BinaryClassifierEvaluator(trainResults.map(_ > 0), trainData.labels.map(_ > 0))
 
     logInfo("\n" + eval.summary())
+    logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
+
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
 

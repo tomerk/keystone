@@ -22,6 +22,7 @@ object AmazonReviewsVWFeaturizer extends Logging {
     val training = trainData.data
     val labels = trainData.labels
 
+    training.count()
     // Build the featurizer
     logInfo("Training featurizer")
     val featurizer = Trim andThen LowerCase() andThen
@@ -30,7 +31,12 @@ object AmazonReviewsVWFeaturizer extends Logging {
         TermFrequency(x => 1) andThen
         (CommonSparseFeatures(conf.commonFeatures), training)
 
-    val vwTrainingFeatures = featurizer.apply(training)
+    val vwTrainingFeatures = featurizer.apply(training).cache()
+    vwTrainingFeatures.count()
+
+    logInfo("PIPELINE TIMING: Finished featurizing training data")
+
+    val startConversionTime = System.currentTimeMillis()
     val vwTrainData = labels.zip(vwTrainingFeatures).map {
       case (label, features) =>
         val target = if (label > 0) 1 else -1
@@ -48,9 +54,11 @@ object AmazonReviewsVWFeaturizer extends Logging {
     }
 
     vwTrainData.saveAsTextFile(conf.trainOutLocation, classOf[GzipCodec])
-    logInfo("PIPELINE TIMING: Finished featurizing training data")
+    val endConversionTime = System.currentTimeMillis()
+    logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
-    logInfo("PIPELINE TIMING: Started featurizing test data")
+
+    /*logInfo("PIPELINE TIMING: Started featurizing test data")
     val testData = LabeledData(AmazonReviewsDataLoader(sc, conf.testLocation, conf.threshold).labeledData.repartition(conf.numParts).cache())
     val vwTestFeatures = featurizer.apply(testData.data)
     val vwTestData = testData.labels.zip(vwTestFeatures).map {
@@ -70,7 +78,7 @@ object AmazonReviewsVWFeaturizer extends Logging {
     }
 
     vwTestData.saveAsTextFile(conf.testOutLocation, classOf[GzipCodec])
-    logInfo("PIPELINE TIMING: Finished featurizing test data")
+    logInfo("PIPELINE TIMING: Finished featurizing test data")*/
   }
 
   case class AmazonReviewsConfig(

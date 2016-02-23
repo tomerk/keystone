@@ -52,6 +52,8 @@ object AmazonReviewsPipelineSystemML extends Logging {
     val eval = BinaryClassifierEvaluator(trainResults, labels)
 
     logInfo("\n" + eval.summary())
+    logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
+
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")
 
   }
