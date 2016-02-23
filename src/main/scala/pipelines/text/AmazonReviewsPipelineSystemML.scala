@@ -1,8 +1,9 @@
 package pipelines.text
 
-import breeze.linalg.{SparseVector, DenseMatrix}
+import breeze.linalg.{DenseVector, SparseVector, DenseMatrix}
+import evaluation.BinaryClassifierEvaluator
 import loaders.{AmazonReviewsDataLoader, LabeledData}
-import nodes.learning.SystemMLLinearReg
+import nodes.learning.{LinearMapEstimator, SystemMLLinearReg}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.CommonSparseFeatures
@@ -13,6 +14,7 @@ import org.apache.sysml.runtime.instructions.spark.utils.RDDConverterUtils
 import org.apache.sysml.runtime.matrix.MatrixCharacteristics
 import org.apache.sysml.runtime.matrix.data.{MatrixCell, MatrixIndexes}
 import pipelines.Logging
+import pipelines.text.AmazonExactSolvePipeline._
 import scopt.OptionParser
 
 object AmazonReviewsPipelineSystemML extends Logging {
@@ -40,10 +42,23 @@ object AmazonReviewsPipelineSystemML extends Logging {
     logInfo("Starting Solve")
     val solveStartTime = System.currentTimeMillis()
     val solver = new SystemMLLinearReg[SparseVector[Double]](conf.scriptLocation, conf.commonFeatures, conf.numIters)
-    solver.fit(featurizedTrainData, labels)
+    val model = solver.fit(featurizedTrainData, labels)
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
+
+    // Evaluate the classifier
+    logInfo("PIPELINE TIMING: Evaluating the classifier")
+
+    val vecLabels = labels.map(i => if (i) DenseVector(1.0) else DenseVector(-1.0))
+    val loss = LinearMapEstimator.computeCost(featurizedTrainData.map(_.toDenseVector), vecLabels, 0, model.x, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
+    val trainResults = model(featurizedTrainData)
+    val eval = BinaryClassifierEvaluator(trainResults, labels)
+
+    logInfo("\n" + eval.summary())
+    logInfo("PIPELINE TIMING: Finished evaluating the classifier")
 
   }
 
@@ -54,9 +69,9 @@ object AmazonReviewsPipelineSystemML extends Logging {
     bOutLocation: String = "",
     threshold: Double = 3.5,
     nGrams: Int = 2,
-    commonFeatures: Int = 1024,
-    numIters: Int = 1,
-    numParts: Int = 16)
+    commonFeatures: Int = 100000,
+    numIters: Int = 20,
+    numParts: Int = 512)
 
   def parse(args: Array[String]): AmazonReviewsConfig = new OptionParser[AmazonReviewsConfig](appName) {
     head(appName, "0.1")
@@ -78,7 +93,7 @@ object AmazonReviewsPipelineSystemML extends Logging {
    */
   def main(args: Array[String]) = {
     val conf = new SparkConf().setAppName(appName)
-    conf.setIfMissing("spark.master", "local[4]") // This is a fallback if things aren't set via spark submit.
+    conf.setIfMissing("spark.master", "local[2]") // This is a fallback if things aren't set via spark submit.
 
     val sc = new SparkContext(conf)
 

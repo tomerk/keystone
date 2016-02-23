@@ -22,7 +22,7 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
    * @param labels Input labels.
    * @return A [[Transformer]] which can be called on new data.
    */
-  override def fit(data: RDD[T], labels: RDD[Boolean]): Transformer[T, Boolean] = {
+  override def fit(data: RDD[T], labels: RDD[Boolean]): BooleanLinearMapper[T] = {
     val featuresToMatrixCell = data.zipWithIndex().flatMap {
       x => x._1.activeIterator.map {
         case (col, value) => (new MatrixIndexes(x._2 + 1, col + 1), new MatrixCell(value))
@@ -66,7 +66,7 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
       "B" -> " ",
       "reg" -> "0",
       "tol" -> "0",
-      "icpt" -> "2",
+      "icpt" -> "0",
       "maxi" -> s"$numIters")
     val outputBlocks = ml.execute(scriptLocation, nargs).getBinaryBlockedRDD("beta_out").rdd.collect()
 
