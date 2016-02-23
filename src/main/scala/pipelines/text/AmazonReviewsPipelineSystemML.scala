@@ -1,20 +1,14 @@
 package pipelines.text
 
-import breeze.linalg.{DenseVector, SparseVector, DenseMatrix}
+import breeze.linalg.{DenseVector, SparseVector}
 import evaluation.BinaryClassifierEvaluator
 import loaders.{AmazonReviewsDataLoader, LabeledData}
 import nodes.learning.{LinearMapEstimator, SystemMLLinearReg}
 import nodes.nlp._
 import nodes.stats.TermFrequency
 import nodes.util.CommonSparseFeatures
-import org.apache.spark.api.java.{JavaPairRDD, JavaSparkContext}
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.sysml.api.MLContext
-import org.apache.sysml.runtime.instructions.spark.utils.RDDConverterUtils
-import org.apache.sysml.runtime.matrix.MatrixCharacteristics
-import org.apache.sysml.runtime.matrix.data.{MatrixCell, MatrixIndexes}
 import pipelines.Logging
-import pipelines.text.AmazonExactSolvePipeline._
 import scopt.OptionParser
 
 object AmazonReviewsPipelineSystemML extends Logging {

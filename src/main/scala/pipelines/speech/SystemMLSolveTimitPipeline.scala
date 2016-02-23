@@ -1,7 +1,8 @@
 package pipelines.speech
 
+import breeze.linalg.DenseVector
 import breeze.stats.distributions.{CauchyDistribution, RandBasis, ThreadLocalRandomGenerator}
-import evaluation.MulticlassClassifierEvaluator
+import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
 import loaders.TimitFeaturesDataLoader
 import nodes.learning._
 import nodes.stats.CosineRandomFeatures
@@ -58,7 +59,7 @@ object SystemMLSolveTimitPipeline extends Logging {
     // Build the pipeline
     val trainDataAndLabels = timitFeaturesData.train.labeledData.repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
-    val trainLabels = ClassLabelIndicatorsFromIntLabels(TimitFeaturesDataLoader.numClasses).apply(trainDataAndLabels.map(_._1))
+    val labels = trainDataAndLabels.map(_._1 == 0)
 
     val featurizer = if (conf.rfType == Distributions.Cauchy) {
       // TODO: Once https://github.com/scalanlp/breeze/issues/398 is released,
@@ -83,68 +84,26 @@ object SystemMLSolveTimitPipeline extends Logging {
 
     logInfo("PIPELINE TIMING: Starting the Solve")
     val solveStartTime = System.currentTimeMillis()
-    val featuresToMatrixCell = featurizedTrainData.zipWithIndex().flatMap {
-      x => x._1.activeIterator.map {
-        case (col, value) => (new MatrixIndexes(x._2 + 1, col + 1), new MatrixCell(value))
-      }
-    }
-
-    val labelsToMatrixCell = trainDataAndLabels.map(i => if (i._1 > 0) 1 else -1).zipWithIndex().map {
-      x => (new MatrixIndexes(x._2 + 1, 1), new MatrixCell(x._1))
-    }
-
-    val ml = new MLContext(sc)
-
-    val numRows = trainDataAndLabels.count()
-    val numCols = numCosineBatches * numCosineFeatures
-    val numRowsPerBlock = 1024
-    val numColsPerBlock = 1024
-
-    val mc = new MatrixCharacteristics(numRows, numCols, numRowsPerBlock, numColsPerBlock)
-    val labelsMC = new MatrixCharacteristics(numRows, 1, numRowsPerBlock, 1)
-
-    val featuresMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
-      new JavaSparkContext(sc),
-      new JavaPairRDD(featuresToMatrixCell),
-      mc,
-      false).cache()
-
-    val labelsMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
-      new JavaSparkContext(sc),
-      new JavaPairRDD(labelsToMatrixCell),
-      labelsMC,
-      false).cache()
-
-    ml.reset()
-    ml.registerInput("X", featuresMatrix, mc)
-    ml.registerInput("y", labelsMatrix, labelsMC)
-
-    val nargs = Map(
-      "X" -> " ",
-      "Y" -> " ",
-      "B" -> conf.bOutLocation,
-      "reg" -> "0",
-      "tol" -> "0",
-      "maxi" -> s"${conf.numEpochs}")
-    val outputs = ml.execute(conf.scriptLocation, nargs)
+    val solver = new SystemMLLinearReg[DenseVector[Double]](conf.scriptLocation, numCosineFeatures * numCosineBatches, conf.numEpochs)
+    val model = solver.fit(featurizedTrainData, labels)
 
     val solveEndTime  = System.currentTimeMillis()
 
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
     logInfo("PIPELINE TIMING: Finished training the classifier")
 
-    /*
-    val loss = LinearMapEstimator.computeCost(featurizedTrainData, trainLabels, conf.lambda, model.x, model.bOpt)
+    // Evaluate the classifier
+    logInfo("PIPELINE TIMING: Evaluating the classifier")
+
+    val vecLabels = labels.map(i => if (i) DenseVector(1.0) else DenseVector(-1.0))
+    val loss = LinearMapEstimator.computeCost(featurizedTrainData.map(_.toDenseVector), vecLabels, 0, model.x, model.bOpt)
     logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
 
-    logInfo("PIPELINE TIMING: Evaluating the classifier")
-    val evaluator = MulticlassClassifierEvaluator(MaxClassifier(model(featurizedTrainData)), trainDataAndLabels.map(_._1),
-      TimitFeaturesDataLoader.numClasses)
-    logInfo("TRAIN Error is " + (100d * evaluator.totalError) + "%")
-    logInfo("\n" + evaluator.summary((0 until 147).map(_.toString).toArray))
+    val trainResults = model(featurizedTrainData)
+    val eval = BinaryClassifierEvaluator(trainResults, labels)
 
+    logInfo("\n" + eval.summary())
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")
-    */
   }
 
   object Distributions extends Enumeration {
