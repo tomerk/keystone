@@ -70,6 +70,9 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
       "maxi" -> s"$numIters")
     val outputBlocks = ml.execute(scriptLocation, nargs).getBinaryBlockedRDD("beta_out").rdd.collect()
 
+    featuresMatrix.unpersist()
+    labelsMatrix.unpersist()
+
     val maxR = {
       val maxRBlock = outputBlocks.maxBy(_._1.getRowIndex)
       (maxRBlock._1.getRowIndex - 1) * blockSize + maxRBlock._2.getMaxRow
