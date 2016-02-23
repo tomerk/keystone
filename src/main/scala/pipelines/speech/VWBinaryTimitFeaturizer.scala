@@ -49,7 +49,7 @@ object VWBinaryTimitFeaturizer extends Logging {
     // Build the pipeline
     val trainDataAndLabels = timitFeaturesData.train.labeledData.repartition(conf.numParts).cache()
     val trainData = trainDataAndLabels.map(_._2)
-    val trainLabels = trainDataAndLabels.map(x => if (x._1 == 0) 1.0 else -1.0)
+    val trainLabels = trainDataAndLabels.map(x => if (x._1 == 0) 1 else -1)
     trainDataAndLabels.count()
 
     val featurizer = if (conf.rfType == Distributions.Cauchy) {
@@ -80,7 +80,7 @@ object VWBinaryTimitFeaturizer extends Logging {
       case (label, features) =>
         val stringBuilder = new StringBuilder()
         // also make sure to attach the label as a tag so we can keep ground truth next to predictions
-        stringBuilder.append(label + 1).append(" '").append(label + 1).append(" |")
+        stringBuilder.append(label).append(" '").append(label).append(" |")
         (0 until features.length).foreach { i =>
           stringBuilder
               .append(" ")
