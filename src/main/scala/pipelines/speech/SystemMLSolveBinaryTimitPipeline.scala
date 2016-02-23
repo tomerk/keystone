@@ -101,6 +101,7 @@ object SystemMLSolveBinaryTimitPipeline extends Logging {
 
     val trainResults = model(featurizedTrainData)
     val eval = BinaryClassifierEvaluator(trainResults, labels)
+    logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
 
     logInfo("\n" + eval.summary())
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")

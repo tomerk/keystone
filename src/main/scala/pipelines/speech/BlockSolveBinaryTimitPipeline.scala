@@ -98,7 +98,7 @@ object BlockSolveBinaryTimitPipeline extends Logging {
     val loss = BlockLeastSquaresEstimator.computeCost(trainingBatches, trainLabels, conf.lambda, model.xs, model.bOpt)
     logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
 
-    val evaluator = MulticlassClassifierEvaluator(MaxClassifier(model.apply(trainingBatches)), trainDataAndLabels.map(_._1),
+    val evaluator = MulticlassClassifierEvaluator(MaxClassifier(model.apply(trainingBatches)), trainDataAndLabels.map(x => if (x._1 == 0) 1 else 0),
       2)
     logInfo("TRAIN Error is " + (100d * evaluator.totalError) + "%")
     logInfo("\n" + evaluator.summary((0 until 2).map(_.toString).toArray))
