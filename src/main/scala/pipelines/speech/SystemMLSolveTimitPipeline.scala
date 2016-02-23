@@ -96,7 +96,7 @@ object SystemMLSolveTimitPipeline extends Logging {
     logInfo("PIPELINE TIMING: Evaluating the classifier")
 
     val vecLabels = labels.map(i => if (i) DenseVector(1.0) else DenseVector(-1.0))
-    val loss = LinearMapEstimator.computeCost(featurizedTrainData.map(_.toDenseVector), vecLabels, 0, model.x, model.bOpt)
+    val loss = LinearMapEstimator.computeCostItemAtATime(featurizedTrainData.map(_.toDenseVector), vecLabels, 0, model.x, model.bOpt)
     logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
 
     val trainResults = model(featurizedTrainData)

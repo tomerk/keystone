@@ -134,30 +134,4 @@ case class BooleanLinearMapper[T <: Vector[Double]](
 
     weights(0) > 0
   }
-
-  /**
-   * Apply a linear model to a collection of inputs.
-   *
-   * @param in Collection of A's.
-   * @return Collection of B's.
-   */
-  override def apply(in: RDD[T]): RDD[Boolean] = {
-    val modelBroadcast = in.context.broadcast(x)
-    val bBroadcast = in.context.broadcast(bOpt)
-
-    val inScaled = featureScaler.map(_.apply(in.map {
-      case dense: DenseVector[Double] => dense
-      case notDense => notDense.toDenseVector
-    })).getOrElse(in)
-
-    inScaled.mapPartitions(rows => {
-      val mat = MatrixUtils.rowsToMatrix(rows) * modelBroadcast.value
-      val out = bBroadcast.value.map { b =>
-        mat(*, ::) :+= b
-        mat
-      }.getOrElse(mat)
-
-      MatrixUtils.matrixToRowArray(out).iterator
-    }).map(x => x(0) > 0)
-  }
 }

@@ -134,4 +134,40 @@ object LinearMapEstimator extends Serializable {
 
   }
 
+  def computeCostItemAtATime[T <: DenseVector[Double]](
+     trainingFeatures: RDD[T],
+     trainingLabels: RDD[DenseVector[Double]],
+     lambda: Double,
+     x: DenseMatrix[Double],
+     bOpt: Option[DenseVector[Double]]): Double = {
+
+    val nTrain = trainingLabels.count
+    val modelBroadcast = trainingLabels.context.broadcast(x)
+    val bBroadcast = trainingLabels.context.broadcast(bOpt)
+
+    val axb = trainingFeatures.map(in => {
+      val out = modelBroadcast.value.t * in
+      val weights = bBroadcast.value.map { b =>
+        out :+= b
+      }.getOrElse(out)
+
+      out
+    })
+
+    val cost = axb.zip(trainingLabels).map { part =>
+      val axb = part._1
+      val labels = part._2
+      val out = axb - labels
+      math.pow(norm(out), 2)
+    }.reduce(_ + _)
+
+    if (lambda == 0) {
+      cost/(2.0*nTrain.toDouble)
+    } else {
+      val wNorm = math.pow(norm(x.toDenseVector), 2)
+      cost/(2.0*nTrain.toDouble) + lambda/2.0 * wNorm
+    }
+
+  }
+
 }
