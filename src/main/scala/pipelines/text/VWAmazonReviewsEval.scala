@@ -19,12 +19,12 @@ object VWAmazonReviewsEval extends Logging {
 
   def run(sc: SparkContext, conf: TimitConfig) {
     val data = sc.textFile(conf.dataLocation)
-    val predictedData = data.pipe(s"${conf.vwLocation} -i ${conf.modelLocation} -t -r /dev/stdout --quiet").cache()
+    val predictedData = data.pipe(s"${conf.vwLocation} -i ${conf.modelLocation} -t -p /dev/stdout --quiet").cache()
     val predicted = predictedData.map(_.split(" ")(0).toDouble)
     val actual = predictedData.map(_.split(" ")(1).toDouble)
 
     logInfo(s"PIPELINE TIMING: has training points ${predictedData.count()}")
-    logInfo(s"PIPELINE TIMING: has training points ${predictedData.take(20).mkString("\n")}")
+    logInfo(s"PIPELINE TIMING: has training points ${predictedData.take(200).mkString("\n")}")
 
     val eval = BinaryClassifierEvaluator(predicted.map(_ > 0), actual.map(_ > 0))
 
