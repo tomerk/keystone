@@ -24,7 +24,7 @@ object VWAmazonReviewsEval extends Logging {
     val actual = predictedData.map(_.split(" ")(1).toDouble)
 
     logInfo(s"PIPELINE TIMING: has training points ${predictedData.count()}")
-    logInfo(s"PIPELINE TIMING: has training points ${predicted.take(20).mkString(", ")}")
+    logInfo(s"PIPELINE TIMING: has training points ${predictedData.take(20).mkString("\n")}")
 
     val eval = BinaryClassifierEvaluator(predicted.map(_ > 0), actual.map(_ > 0))
 
