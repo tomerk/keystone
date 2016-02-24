@@ -13,7 +13,7 @@ import scopt.OptionParser
 
 
 object LBFGSSolveBinaryTimitPipeline extends Logging {
-  val appName = "LBFGS Solve TIMIT Pipeline"
+  val appName = "LBFGS Solve Binary TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",

@@ -13,7 +13,7 @@ import scopt.OptionParser
 
 
 object ExactSolveBinaryTimitPipeline extends Logging {
-  val appName = "Exact Solve TIMIT Pipeline"
+  val appName = "Exact Solve Binary TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",

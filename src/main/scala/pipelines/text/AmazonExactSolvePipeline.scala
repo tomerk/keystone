@@ -13,7 +13,7 @@ import scopt.OptionParser
 import workflow.{Transformer, Optimizer}
 
 object AmazonExactSolvePipeline extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline Exact Solve"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 

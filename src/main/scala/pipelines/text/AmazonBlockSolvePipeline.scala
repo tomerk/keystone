@@ -15,7 +15,7 @@ import scopt.OptionParser
 import workflow.{Optimizer, Transformer}
 
 object AmazonBlockSolvePipeline extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline Block Solve"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 

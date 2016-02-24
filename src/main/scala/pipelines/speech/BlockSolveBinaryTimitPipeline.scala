@@ -13,7 +13,7 @@ import scopt.OptionParser
 
 
 object BlockSolveBinaryTimitPipeline extends Logging {
-  val appName = "Block Solve TIMIT Pipeline"
+  val appName = "Block Solve Binary TIMIT Pipeline"
 
   case class TimitConfig(
     trainDataLocation: String = "",

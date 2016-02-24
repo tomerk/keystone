@@ -11,7 +11,7 @@ import pipelines.Logging
 import scopt.OptionParser
 
 object AmazonLBFGSSolvePipeline extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline LBFGS Solve"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 

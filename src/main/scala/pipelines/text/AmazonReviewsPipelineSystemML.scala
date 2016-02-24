@@ -12,7 +12,7 @@ import pipelines.Logging
 import scopt.OptionParser
 
 object AmazonReviewsPipelineSystemML extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline SystemML Solve"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
     logInfo("PIPELINE TIMING: Started training the classifier")

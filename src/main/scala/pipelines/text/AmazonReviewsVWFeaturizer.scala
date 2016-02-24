@@ -13,7 +13,7 @@ import scopt.OptionParser
 import workflow.Optimizer
 
 object AmazonReviewsVWFeaturizer extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline VW Featurizer"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 

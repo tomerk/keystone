@@ -8,7 +8,7 @@ import scopt.OptionParser
 
 
 object VWBinaryTimitEval extends Logging {
-  val appName = "VW Timit Eval"
+  val appName = "VW Binary Timit Eval"
 
   case class TimitConfig(
     dataLocation: String = "",

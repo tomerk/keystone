@@ -9,7 +9,7 @@ import scopt.OptionParser
 
 
 object VWAmazonReviewsEval extends Logging {
-  val appName = "VW Timit Eval"
+  val appName = "VW Amazon Eval"
 
   case class TimitConfig(
     dataLocation: String = "",
