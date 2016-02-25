@@ -139,14 +139,19 @@ object LinearMapEstimator extends Serializable {
      trainingLabels: RDD[DenseVector[Double]],
      lambda: Double,
      x: DenseMatrix[Double],
+     featuresMeanOpt: Option[DenseVector[Double]],
      bOpt: Option[DenseVector[Double]]): Double = {
 
     val nTrain = trainingLabels.count
     val modelBroadcast = trainingLabels.context.broadcast(x)
     val bBroadcast = trainingLabels.context.broadcast(bOpt)
+    val featuresMeanBroadcast = trainingLabels.context.broadcast(featuresMeanOpt)
 
     val axb = trainingFeatures.map(in => {
-      val out = modelBroadcast.value.t * in
+      val shiftedIn = featuresMeanBroadcast.value.map { m =>
+        in - m
+      }.getOrElse(in)
+      val out = modelBroadcast.value.t * shiftedIn
       val weights = bBroadcast.value.map { b =>
         out :+= b
       }.getOrElse(out)

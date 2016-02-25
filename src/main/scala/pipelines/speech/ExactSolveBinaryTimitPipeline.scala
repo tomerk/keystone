@@ -81,7 +81,7 @@ object ExactSolveBinaryTimitPipeline extends Logging {
     logInfo(s"PIPELINE TIMING: Finished Solve in ${solveEndTime - solveStartTime} ms")
     logInfo("PIPELINE TIMING: Finished training the classifier")
 
-    val loss = LinearMapEstimator.computeCostItemAtATime(featurizedTrainData, trainLabels, conf.lambda, model.x, model.bOpt)
+    val loss = LinearMapEstimator.computeCostItemAtATime(featurizedTrainData, trainLabels, conf.lambda, model.x, model.featureScaler.map(_.mean), model.bOpt)
     logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
 
     logInfo("PIPELINE TIMING: Evaluating the classifier")
