@@ -1,7 +1,7 @@
 package nodes.learning
 
 import breeze.linalg.{*, DenseVector, DenseMatrix, Vector}
-import nodes.stats.StandardScalerModel
+import nodes.stats.{StandardScaler, StandardScalerModel}
 import org.apache.spark.api.java.{JavaPairRDD, JavaSparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.sysml.api.MLContext
@@ -15,7 +15,7 @@ import workflow.{Transformer, LabelEstimator}
 /**
  * Created by tomerk11 on 2/22/16.
  */
-class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures: Int, numIters: Double, blockSize: Int = 1024) extends LabelEstimator[T, Boolean, Boolean] with Logging {
+class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures: Int, numIters: Double, useIntercept: Boolean = false, blockSize: Int = 1024) extends LabelEstimator[T, Boolean, Boolean] with Logging {
   /**
    * A LabelEstimator estimator is an estimator which expects labeled data.
    *
@@ -26,13 +26,26 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
   override def fit(data: RDD[T], labels: RDD[Boolean]): BooleanLinearMapper[T] = {
     val startConversionTime = System.currentTimeMillis()
 
-    val featuresToMatrixCell = data.zipWithIndex().flatMap {
+    val dataVecs = data.map {
+      case dense: DenseVector[Double] => dense
+      case other => other.toDenseVector
+    }
+    val featureScaler = if (useIntercept) {
+      Some(new StandardScaler(normalizeStdDev = false).fit(dataVecs))
+    } else None
+
+    val labelVecs = labels.map(label => if (label) DenseVector(1.0) else DenseVector(-1.0))
+    val labelScaler = if (useIntercept) {
+      Some(new StandardScaler(normalizeStdDev = false).fit(labelVecs))
+    } else None
+
+    val featuresToMatrixCell = featureScaler.map(scaler => scaler.apply(dataVecs)).getOrElse(data).zipWithIndex().flatMap {
       x => x._1.activeIterator.map {
         case (col, value) => (new MatrixIndexes(x._2 + 1, col + 1), new MatrixCell(value))
       }
     }
 
-    val labelsToMatrixCell = labels.map(i => if (i) 1 else -1).zipWithIndex().map {
+    val labelsToMatrixCell = labelScaler.map(scaler => scaler.apply(labelVecs)).getOrElse(labelVecs).map(label => label(0)).zipWithIndex().map {
       x => (new MatrixIndexes(x._2 + 1, 1), new MatrixCell(x._1))
     }
 
@@ -106,7 +119,7 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
         }
     }
 
-    BooleanLinearMapper(matOut)
+    BooleanLinearMapper(matOut, labelScaler.map(_.mean), featureScaler)
   }
 }
 

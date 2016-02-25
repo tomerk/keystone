@@ -84,7 +84,7 @@ object SystemMLSolveBinaryTimitPipeline extends Logging {
 
     logInfo("PIPELINE TIMING: Starting the Solve")
     val solveStartTime = System.currentTimeMillis()
-    val solver = new SystemMLLinearReg[DenseVector[Double]](conf.scriptLocation, numCosineFeatures * numCosineBatches, conf.numEpochs)
+    val solver = new SystemMLLinearReg[DenseVector[Double]](conf.scriptLocation, numCosineFeatures * numCosineBatches, conf.numEpochs, useIntercept = true)
     val model = solver.fit(featurizedTrainData, labels)
 
     val solveEndTime  = System.currentTimeMillis()
