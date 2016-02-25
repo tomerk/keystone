@@ -1,5 +1,6 @@
 package pipelines.text
 
+import breeze.linalg.norm
 import evaluation.{BinaryClassifierEvaluator, MulticlassClassifierEvaluator}
 import loaders.TimitFeaturesDataLoader
 import org.apache.spark.{SparkConf, SparkContext}
@@ -9,7 +10,7 @@ import scopt.OptionParser
 
 
 object VWAmazonReviewsEval extends Logging {
-  val appName = "VW Timit Eval"
+  val appName = "VW Amazon Eval"
 
   case class TimitConfig(
     dataLocation: String = "",
@@ -18,14 +19,28 @@ object VWAmazonReviewsEval extends Logging {
 
   def run(sc: SparkContext, conf: TimitConfig) {
     val data = sc.textFile(conf.dataLocation)
-    val predictedData = data.pipe(s"${conf.vwLocation} -i ${conf.modelLocation} -t -p /dev/stdout --quiet")
+    val predictedData = data.pipe(s"${conf.vwLocation} -i ${conf.modelLocation} -t -r /dev/stdout --quiet").cache()
     val predicted = predictedData.map(_.split(" ")(0).toDouble)
     val actual = predictedData.map(_.split(" ")(1).toDouble)
 
+    logInfo(s"PIPELINE TIMING: has training points ${predictedData.count()}")
+    logInfo(s"PIPELINE TIMING: has training points ${predictedData.take(200).mkString("\n")}")
 
     val eval = BinaryClassifierEvaluator(predicted.map(_ > 0), actual.map(_ > 0))
 
+
     logInfo("\n" + eval.summary())
+    logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
+
+    val cost = predicted.zip(actual).map { part =>
+      val axb = part._1
+      val labels = part._2
+      val out = axb - labels
+      out * out
+    }.reduce(_ + _)
+
+    val loss = cost/(2.0*predictedData.count().toDouble)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
   }
 
   def parse(args: Array[String]): TimitConfig = new OptionParser[TimitConfig](appName) {
@@ -38,6 +53,7 @@ object VWAmazonReviewsEval extends Logging {
 
   /**
    * The actual driver receives its configuration parameters from spark-submit usually.
+ *
    * @param args
    */
   def main(args: Array[String]) = {

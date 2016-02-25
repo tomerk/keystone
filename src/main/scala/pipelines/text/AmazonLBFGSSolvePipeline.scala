@@ -11,7 +11,7 @@ import pipelines.Logging
 import scopt.OptionParser
 
 object AmazonLBFGSSolvePipeline extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline LBFGS Solve"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
@@ -46,6 +46,8 @@ object AmazonLBFGSSolvePipeline extends Logging {
     val eval = BinaryClassifierEvaluator(trainResults.map(_ > 0), labels.map(_ > 0))
 
     logInfo("\n" + eval.summary())
+    logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
+
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
 

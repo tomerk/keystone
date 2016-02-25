@@ -9,12 +9,13 @@ import nodes.stats.TermFrequency
 import nodes.util.{VectorSplitter, ClassLabelIndicatorsFromIntLabels, CommonSparseFeatures, MaxClassifier}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+import pipelines.speech.BlockSolveTimitPipeline._
 import pipelines.{FunctionNode, Logging}
 import scopt.OptionParser
 import workflow.{Optimizer, Transformer}
 
 object AmazonBlockSolvePipeline extends Logging {
-  val appName = "AmazonReviewsPipeline"
+  val appName = "AmazonReviewsPipeline Block Solve"
 
   def run(sc: SparkContext, conf: AmazonReviewsConfig) {
 
@@ -46,10 +47,15 @@ object AmazonBlockSolvePipeline extends Logging {
     // Evaluate the classifier
     logInfo("PIPELINE TIMING: Evaluating the classifier")
 
+    val loss = BlockLeastSquaresEstimator.computeCost(splitFeaturizedTrainData, labels, 0, model.xs, model.bOpt)
+    logInfo(s"PIPELINE TIMING: Least squares loss was $loss")
+
     val trainResults = MaxClassifier(model(splitFeaturizedTrainData))
     val eval = BinaryClassifierEvaluator(trainResults.map(_ > 0), trainData.labels.map(_ > 0))
 
     logInfo("\n" + eval.summary())
+    logInfo("TRAIN Error is " + (100d * (1.0 - eval.accuracy)) + "%")
+
     logInfo("PIPELINE TIMING: Finished evaluating the classifier")
   }
 
@@ -77,6 +83,7 @@ object AmazonBlockSolvePipeline extends Logging {
 
   /**
    * The actual driver receives its configuration parameters from spark-submit usually.
+   *
    * @param args
    */
   def main(args: Array[String]) = {

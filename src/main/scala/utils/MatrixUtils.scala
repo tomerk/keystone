@@ -29,8 +29,12 @@ object MatrixUtils extends Serializable {
    * @param in Sequence of of DenseVectors (rows)
    * @return A row matrix.
    */
-  def rowsToMatrix[T : ClassTag](in: TraversableOnce[DenseVector[T]]): DenseMatrix[T] = {
-    rowsToMatrix(in.toArray)
+  def rowsToMatrix[T : ClassTag](in: TraversableOnce[Vector[T]]): DenseMatrix[T] = {
+    if (!in.isEmpty) {
+      rowsToMatrix(in.toArray)
+    } else {
+      new DenseMatrix[T](0, 0)
+    }
   }
 
   /**
@@ -39,7 +43,7 @@ object MatrixUtils extends Serializable {
    * @param inArr Array of DenseVectors (rows)
    * @return A row matrix.
    */
-  def rowsToMatrix[T : ClassTag](inArr: Array[DenseVector[T]]): DenseMatrix[T] = {
+  def rowsToMatrix[T : ClassTag](inArr: Array[Vector[T]]): DenseMatrix[T] = {
     val nRows = inArr.length
     val nCols = inArr(0).length
     val outArr = new Array[T](nRows * nCols)
