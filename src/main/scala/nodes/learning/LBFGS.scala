@@ -89,6 +89,10 @@ object LBFGSwithL2 extends Logging {
       maxNumIterations: Int,
       regParam: Double): DenseMatrix[Double] = {
 
+    val lossHistory = mutable.ArrayBuilder.make[Double]
+    val numExamples = data.count
+    val numFeatures = data.first.length
+    val numClasses = labels.first.length
 
     val dataMat = featureScaler.apply(data).mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
@@ -98,10 +102,8 @@ object LBFGSwithL2 extends Logging {
       Iterator.single(MatrixUtils.rowsToMatrix(part))
     }.cache()
 
-    val lossHistory = mutable.ArrayBuilder.make[Double]
-    val numExamples = data.count
-    val numFeatures = data.first.length
-    val numClasses = labels.first.length
+    dataMat.count()
+    labelsMat.count()
 
     data.unpersist()
     labels.unpersist()
