@@ -92,11 +92,11 @@ object LBFGSwithL2 extends Logging {
 
     val dataMat = data.mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
-    }
+    }.cache()
 
     val labelsMat = labels.mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
-    }
+    }.cache()
 
     val costFun = new CostFun(dataMat, labelsMat, gradient, regParam, numExamples, numFeatures,
       numClasses)
