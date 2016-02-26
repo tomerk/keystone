@@ -22,6 +22,7 @@ object BlockSolveBinaryTimitPipeline extends Logging {
     testLabelsLocation: String = "",
     numParts: Int = 512,
     numCosines: Int = 50,
+    blockSize: Int = 1024,
     gamma: Double = 0.05555,
     rfType: Distributions.Value = Distributions.Gaussian,
     lambda: Double = 0.0,
@@ -40,7 +41,7 @@ object BlockSolveBinaryTimitPipeline extends Logging {
     val random = new java.util.Random(seed)
     val randomSource = new RandBasis(new ThreadLocalRandomGenerator(new MersenneTwister(random.nextLong())))
 
-    val numCosineFeatures = 1024
+    val numCosineFeatures = conf.blockSize
     val numCosineBatches = conf.numCosines
 
     // Load the data
@@ -121,6 +122,7 @@ object BlockSolveBinaryTimitPipeline extends Logging {
     opt[String]("checkpointDir") action { (x,c) => c.copy(checkpointDir=Some(x)) }
     opt[Int]("numParts") action { (x,c) => c.copy(numParts=x) }
     opt[Int]("numCosines") action { (x,c) => c.copy(numCosines=x) }
+    opt[Int]("blockSize") action { (x,c) => c.copy(blockSize=x) }
     opt[Int]("numEpochs") action { (x,c) => c.copy(numEpochs=x) }
     opt[Double]("gamma") action { (x,c) => c.copy(gamma=x) }
     opt[Double]("lambda") action { (x,c) => c.copy(lambda=x) }
