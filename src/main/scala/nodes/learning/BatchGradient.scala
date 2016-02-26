@@ -36,13 +36,23 @@ class LeastSquaresBatchGradient extends BatchGradient {
       weights: DenseMatrix[Double])
     : (DenseMatrix[Double], Double) = {
 
-    // Least Squares Gradient is At.(Ax - b)
-    val axb = data * weights - labels
-    val grad = data.t * (axb)
-    // Loss is 0.5 * norm(Ax - b)
-    val loss = 0.5 * math.pow(norm(axb.toDenseVector), 2)
+    if (labels.cols != 2) {
+      // Least Squares Gradient is At.(Ax - b)
+      val axb = data * weights - labels
+      val grad = data.t * (axb)
+      // Loss is 0.5 * norm(Ax - b)
+      val loss = 0.5 * math.pow(norm(axb.toDenseVector), 2)
 
-    (grad, loss)
+      (grad, loss)
+    } else {
+      val axb = data * weights(::, 0) - labels(::, 0)
+      val grad = data.t * axb
+      val loss = math.pow(norm(axb.toDenseVector), 2)
+      val gradMat = new DenseMatrix[Double](grad.length, 2)
+      gradMat(::, 0) := grad
+      gradMat(::, 1) := ((grad :* -1.0))
+      (gradMat, loss)
+    }
   }
 
 }
