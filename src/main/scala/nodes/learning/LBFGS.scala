@@ -92,6 +92,8 @@ object LBFGSwithL2 extends Logging {
     val lossHistory = mutable.ArrayBuilder.make[Double]
     val numExamples = data.count
 
+    val startConversionTime = System.currentTimeMillis()
+
     val dataMat = featureScaler.apply(data).mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
     }.cache()
@@ -105,6 +107,8 @@ object LBFGSwithL2 extends Logging {
 
     data.unpersist()
     labels.unpersist()
+    val endConversionTime = System.currentTimeMillis()
+    logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
     val numFeatures = dataMat.map(_.cols).collect().head
     val numClasses = labelsMat.map(_.cols).collect().head
