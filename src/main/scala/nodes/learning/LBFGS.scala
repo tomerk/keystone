@@ -58,8 +58,10 @@ class LBFGSwithL2(
     val labelScaler = new StandardScaler(normalizeStdDev = false).fit(labels)
 
     val model = LBFGSwithL2.runLBFGS(
-      featureScaler.apply(data),
-      labelScaler.apply(labels),
+      data,
+      labels,
+      featureScaler,
+      labelScaler,
       gradient,
       numCorrections,
       convergenceTol,
@@ -79,24 +81,30 @@ object LBFGSwithL2 extends Logging {
   def runLBFGS(
       data: RDD[DenseVector[Double]],
       labels: RDD[DenseVector[Double]],
+      featureScaler: StandardScalerModel,
+      labelScaler: StandardScalerModel,
       gradient: BatchGradient,
       numCorrections: Int,
       convergenceTol: Double,
       maxNumIterations: Int,
       regParam: Double): DenseMatrix[Double] = {
 
+
+    val dataMat = featureScaler.apply(data).mapPartitions { part =>
+      Iterator.single(MatrixUtils.rowsToMatrix(part))
+    }.cache()
+
+    val labelsMat = labelScaler.apply(labels).mapPartitions { part =>
+      Iterator.single(MatrixUtils.rowsToMatrix(part))
+    }.cache()
+
     val lossHistory = mutable.ArrayBuilder.make[Double]
     val numExamples = data.count
     val numFeatures = data.first.length
     val numClasses = labels.first.length
 
-    val dataMat = data.mapPartitions { part =>
-      Iterator.single(MatrixUtils.rowsToMatrix(part))
-    }.cache()
-
-    val labelsMat = labels.mapPartitions { part =>
-      Iterator.single(MatrixUtils.rowsToMatrix(part))
-    }.cache()
+    data.unpersist()
+    labels.unpersist()
 
     val costFun = new CostFun(dataMat, labelsMat, gradient, regParam, numExamples, numFeatures,
       numClasses)
