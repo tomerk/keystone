@@ -91,8 +91,6 @@ object LBFGSwithL2 extends Logging {
 
     val lossHistory = mutable.ArrayBuilder.make[Double]
     val numExamples = data.count
-    val numFeatures = data.first.length
-    val numClasses = labels.first.length
 
     val dataMat = featureScaler.apply(data).mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
@@ -107,6 +105,9 @@ object LBFGSwithL2 extends Logging {
 
     data.unpersist()
     labels.unpersist()
+
+    val numFeatures = dataMat.map(_.cols).collect().head
+    val numClasses = labelsMat.map(_.cols).collect().head
 
     val costFun = new CostFun(dataMat, labelsMat, gradient, regParam, numExamples, numFeatures,
       numClasses)
