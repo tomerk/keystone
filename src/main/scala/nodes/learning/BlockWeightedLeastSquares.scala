@@ -163,9 +163,14 @@ object BlockWeightedLeastSquaresEstimator extends Logging {
       mat(*, ::) :- jointLabelMean
     }.cache().setName("residual")
 
-    var residualMean = MLMatrixUtils.treeReduce(residual.map { mat =>
-      mean(mat(::, *)).toDenseVector
-    }, (a: DenseVector[Double], b: DenseVector[Double]) => a += b ) /= nClasses.toDouble
+    val residualSumCount = MLMatrixUtils.treeReduce(residual.map { mat =>
+      (sum(mat(::, *)).toDenseVector, mat.rows)
+    }, (a: (DenseVector[Double], Int), b: (DenseVector[Double], Int)) => {
+      a._1 += b._1
+      (a._1, a._2 + b._2)
+    })
+
+    var residualMean = residualSumCount._1 /= residualSumCount._2.toDouble
 
     @transient val blockStats: Array[Option[BlockStatistics]] = (0 until numBlocks).map { blk =>
       None
@@ -263,10 +268,7 @@ object BlockWeightedLeastSquaresEstimator extends Logging {
           W.toDenseMatrix.t
         }.collect()
 
-        // TODO: Write a more reasonable conversion function here.
-        val localFullModel = modelsThisPass.reduceLeft { (a, b) =>
-          DenseMatrix.horzcat(a, b)
-        }
+        val localFullModel = DenseMatrix.horzcat(modelsThisPass:_*)
 
         // So newXj is oldXj + localFullModel
         models(block) += localFullModel
@@ -281,11 +283,14 @@ object BlockWeightedLeastSquaresEstimator extends Logging {
         residual.unpersist()
         residual = newResidual
 
-        residualMean = residual.map { mat =>
-          mean(mat(::, *)).toDenseVector
-        }.reduce { (a: DenseVector[Double], b: DenseVector[Double]) =>
-          a += b
-        } /= nClasses.toDouble
+        val residualSumCount = MLMatrixUtils.treeReduce(residual.map { mat =>
+          (sum(mat(::, *)).toDenseVector, mat.rows)
+        }, (a: (DenseVector[Double], Int), b: (DenseVector[Double], Int)) => {
+          a._1 += b._1
+          (a._1, a._2 + b._2)
+        })
+
+        residualMean = residualSumCount._1 /= residualSumCount._2.toDouble
 
         popCovBC.unpersist()
         popMeanBC.unpersist()
