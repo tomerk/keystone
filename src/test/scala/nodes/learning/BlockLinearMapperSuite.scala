@@ -1,6 +1,8 @@
 package nodes.learning
 
-import breeze.linalg.{DenseVector, DenseMatrix}
+import java.io._
+
+import breeze.linalg._
 import breeze.stats.distributions.Rand
 import scala.collection.mutable.ArrayBuffer
 
@@ -10,9 +12,19 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import pipelines._
-import utils.Stats
+import nodes.util.VectorSplitter
+import utils.{Stats, MatrixUtils, TestUtils}
 
 class BlockLinearMapperSuite extends FunSuite with LocalSparkContext with Logging {
+
+  def loadMatrixRDDs(aMatFile: String, bMatFile: String, numParts: Int, sc: SparkContext) = {
+    val aMat = csvread(new File(TestUtils.getTestResourceFileName("aMat.csv")))
+    val bMat = csvread(new File(TestUtils.getTestResourceFileName("bMat.csv")))
+
+    val fullARDD = sc.parallelize(MatrixUtils.matrixToRowArray(aMat), numParts).cache()
+    val bRDD = sc.parallelize(MatrixUtils.matrixToRowArray(bMat), numParts).cache()
+    (fullARDD, bRDD)
+  }
 
   test("BlockLinearMapper transformation") {
     sc = new SparkContext("local", "test")
@@ -51,5 +63,39 @@ class BlockLinearMapperSuite extends FunSuite with LocalSparkContext with Loggin
 
     // The last blmOut should match the linear mapper's output
     assert(Stats.aboutEq(blmOuts.last.collect()(0), linearOut, 1e-4))
+  }
+
+  test("Binary BCD should match LinearMapper") {
+    sc = new SparkContext("local", "test")
+    val blockSize = 4
+    val numIter = 10
+    val lambda = 0.1
+    val numParts = 3
+
+    val (fullARDD, bRDD) = loadMatrixRDDs("aMat.csv", "bMat.csv", numParts, sc)
+
+    val numFeatures = fullARDD.first.length
+    val nTrain = fullARDD.count.toDouble
+
+    val vectorSplitter = new VectorSplitter(blockSize)
+    val featureBlocks = vectorSplitter.apply(fullARDD)
+    val firstClassLabels = bRDD.map(x => x(0))
+
+    val model = BinaryBlockCoordinateDescent.trainSingleClassLS(blockSize,
+      numIter, lambda, numFeatures, featureBlocks, firstClassLabels)
+
+    val finalFullModel = DenseVector.vertcat(model:_*) 
+
+    val aMat = csvread(new File(TestUtils.getTestResourceFileName("aMat.csv")))
+    val bMat = csvread(new File(TestUtils.getTestResourceFileName("bMat.csv")))
+
+    val localModel = 
+      ((((aMat.t * aMat):/nTrain) + (DenseMatrix.eye[Double](aMat.cols) * lambda))) \
+        ((aMat.t * bMat(::, 0)) :/nTrain)
+
+    val gradient = ((aMat.t * (aMat * finalFullModel - bMat(::, 0))) :/ nTrain) 
+      + lambda * finalFullModel
+    println("norm gradient " + norm(gradient))
+    assert(norm(gradient) < 1e-2)
   }
 }
