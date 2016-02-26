@@ -35,7 +35,6 @@ object BinaryBlockCoordinateDescent extends Logging {
       blockSize: Int,
       numIter: Int,
       lambda: Double,
-      numFeatures: Int,
       trainingFeatureBlocks: Seq[RDD[DenseVector[Double]]],
       labels: RDD[Double]): Seq[DenseVector[Double]] = {
 
@@ -49,7 +48,7 @@ object BinaryBlockCoordinateDescent extends Logging {
 
     // Initialize model to blockSize. This will be resized if its different
     // inside the solve loop
-    val numBlocks = math.ceil(numFeatures / blockSize).toInt
+    val numBlocks = trainingFeatureBlocks.size
     val model = (0 until numBlocks).map { block =>
       DenseVector.zeros[Double](blockSize)
     }.toArray

@@ -212,33 +212,57 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
       trainingFeatures: Seq[RDD[DenseVector[Double]]],
       trainingLabels: RDD[DenseVector[Double]]): BlockLinearMapper = {
     val labelScaler = new StandardScaler(normalizeStdDev = false).fit(trainingLabels)
-    // Find out numRows, numCols once
-    val b = RowPartitionedMatrix.fromArray(
-      labelScaler.apply(trainingLabels).map(_.toArray)).cache()
-    val numRows = Some(b.numRows())
-    val numCols = Some(blockSize.toLong)
-
     // NOTE: This will cause trainingFeatures to be evaluated twice
     // which might not be optimal if its not cached ?
     val featureScalers = trainingFeatures.map { rdd =>
       new StandardScaler(normalizeStdDev = false).fit(rdd)
     }
 
-    val A = trainingFeatures.zip(featureScalers).map { case (rdd, scaler) =>
-      new RowPartitionedMatrix(scaler.apply(rdd).mapPartitions { rows =>
-        Iterator.single(MatrixUtils.rowsToMatrix(rows))
-      }.map(RowPartition), numRows, numCols)
-    }
+    val numClasses = trainingLabels.first.length
 
-    val bcd = new BlockCoordinateDescent()
-    val models = if (numIter > 1) {
-      bcd.solveLeastSquaresWithL2(
-        A, b, Array(lambda), numIter, new NormalEquations()).transpose
+    if (numClasses == 2) {
+      val labelsZmOneClass = labelScaler.apply(trainingLabels).map(x => x(0))
+      val featuresZm = trainingFeatures.zip(featureScalers).map { case (rdd, scaler) =>
+        scaler.apply(rdd)
+      }
+
+      val model = BinaryBlockCoordinateDescent.trainSingleClassLS(
+        blockSize, numIter, lambda, featuresZm, labelsZmOneClass)
+
+      // TODO(shivaram): Make this more efficient ?
+      val twoClassModel = new Array[DenseMatrix[Double]](model.size)
+      model.zipWithIndex.foreach { case (vec, idx) =>
+        val mat = new DenseMatrix[Double](vec.length, 2)
+        mat(::, 0) := vec
+        mat(::, 1) := (vec * -1.0)
+        twoClassModel(idx) = mat
+      }
+
+      new BlockLinearMapper(twoClassModel.toSeq, blockSize, Some(labelScaler.mean), Some(featureScalers))
+
     } else {
-      bcd.solveOnePassL2(A.iterator, b, Array(lambda), new NormalEquations()).toSeq.transpose
-    }
+      // Find out numRows, numCols once
+      val b = RowPartitionedMatrix.fromArray(
+        labelScaler.apply(trainingLabels).map(_.toArray)).cache()
+      val numRows = Some(b.numRows())
+      val numCols = Some(blockSize.toLong)
 
-    new BlockLinearMapper(models.head, blockSize, Some(labelScaler.mean), Some(featureScalers))
+      val A = trainingFeatures.zip(featureScalers).map { case (rdd, scaler) =>
+        new RowPartitionedMatrix(scaler.apply(rdd).mapPartitions { rows =>
+          Iterator.single(MatrixUtils.rowsToMatrix(rows))
+        }.map(RowPartition), numRows, numCols)
+      }
+
+      val bcd = new BlockCoordinateDescent()
+      val models = if (numIter > 1) {
+        bcd.solveLeastSquaresWithL2(
+          A, b, Array(lambda), numIter, new NormalEquations()).transpose
+      } else {
+        bcd.solveOnePassL2(A.iterator, b, Array(lambda), new NormalEquations()).toSeq.transpose
+      }
+
+      new BlockLinearMapper(models.head, blockSize, Some(labelScaler.mean), Some(featureScalers))
+    }
   }
 
   /**

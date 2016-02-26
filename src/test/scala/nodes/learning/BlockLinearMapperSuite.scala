@@ -74,7 +74,6 @@ class BlockLinearMapperSuite extends FunSuite with LocalSparkContext with Loggin
 
     val (fullARDD, bRDD) = loadMatrixRDDs("aMat.csv", "bMat.csv", numParts, sc)
 
-    val numFeatures = fullARDD.first.length
     val nTrain = fullARDD.count.toDouble
 
     val vectorSplitter = new VectorSplitter(blockSize)
@@ -82,19 +81,19 @@ class BlockLinearMapperSuite extends FunSuite with LocalSparkContext with Loggin
     val firstClassLabels = bRDD.map(x => x(0))
 
     val model = BinaryBlockCoordinateDescent.trainSingleClassLS(blockSize,
-      numIter, lambda, numFeatures, featureBlocks, firstClassLabels)
+      numIter, lambda, featureBlocks, firstClassLabels)
 
-    val finalFullModel = DenseVector.vertcat(model:_*) 
+    val finalFullModel = DenseVector.vertcat(model:_*)
 
     val aMat = csvread(new File(TestUtils.getTestResourceFileName("aMat.csv")))
     val bMat = csvread(new File(TestUtils.getTestResourceFileName("bMat.csv")))
 
-    val localModel = 
+    val localModel =
       ((((aMat.t * aMat):/nTrain) + (DenseMatrix.eye[Double](aMat.cols) * lambda))) \
         ((aMat.t * bMat(::, 0)) :/nTrain)
 
-    val gradient = ((aMat.t * (aMat * finalFullModel - bMat(::, 0))) :/ nTrain) 
-      + lambda * finalFullModel
+    val aTaxb = (aMat.t * (aMat * finalFullModel - bMat(::, 0)))
+    val gradient = ( aTaxb :/ nTrain) + (finalFullModel :* lambda)
     println("norm gradient " + norm(gradient))
     assert(norm(gradient) < 1e-2)
   }
