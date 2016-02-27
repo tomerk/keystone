@@ -1,5 +1,7 @@
 package pipelines.images.cifar
 
+import scala.reflect.ClassTag
+
 import breeze.linalg._
 import breeze.numerics._
 import evaluation.MulticlassClassifierEvaluator
@@ -8,28 +10,37 @@ import nodes.images._
 import nodes.learning.{BlockLeastSquaresEstimator, ZCAWhitener, ZCAWhitenerEstimator}
 import nodes.stats.{StandardScaler, Sampler}
 import nodes.util.{Cacher, ClassLabelIndicatorsFromIntLabels, MaxClassifier}
+import pipelines.FunctionNode
+
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.rdd.RDD
 import pipelines.Logging
 import scopt.OptionParser
-import utils.{MatrixUtils, Stats}
+import utils.{MatrixUtils, Stats, Image, ImageUtils}
 
+object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
+  val appName = "RandomPatchCifarFeaturizerRawAugment"
 
-object RandomPatchCifar extends Serializable with Logging {
-  val appName = "RandomPatchCifar"
+  class LabelAugmenter[T: ClassTag](mult: Int) extends FunctionNode[RDD[T], RDD[T]] {
+    def apply(in: RDD[T]) = in.flatMap(x => Seq.fill(mult)(x))
+  }
 
-  def run(sc: SparkContext, conf: RandomCifarConfig) {
+  def run(sc: SparkContext, conf: RandomCifarFeaturizerConfig) {
     //Set up some constants.
     val numClasses = 10
-    val imageSize = 32
     val numChannels = 3
     val whitenerSize = 100000
+    val numRandomPatchesAugment = conf.numRandomPatchesAugment
+    val augmentRandomPatchSize = 24
+    val numTestAugment = 10 // 4 corners, center and flips of each of the 5
 
     // Load up training data, and optionally sample.
-    val trainData = conf.sampleFrac match {
-      case Some(f) => CifarLoader(sc, conf.trainLocation).sample(false, f).cache
-      case None => CifarLoader(sc, conf.trainLocation).cache
-    }
-    val trainImages = ImageExtractor(trainData)
+    val trainData = CifarLoader(sc, conf.trainLocation).cache()
+    // Augment data here
+    val randomFlipper = new RandomFlips(numRandomPatchesAugment, augmentRandomPatchSize)
+
+    val trainImages = ImageExtractor.andThen(new Cacher[Image](Some("trainImages"))).apply(trainData)
+    val trainImagesAugmented = randomFlipper(trainImages)
 
     val patchExtractor = new Windower(conf.patchSteps, conf.patchSize)
       .andThen(ImageVectorizer.apply)
@@ -49,8 +60,7 @@ object RandomPatchCifar extends Serializable with Logging {
         ((unnormFilters(::, *) / (twoNorms + 1e-10)) * whitener.whitener.t, whitener)
     }
 
-
-    val unscaledFeaturizer = new Convolver(filters, imageSize, imageSize, numChannels, Some(whitener), true)
+    val unscaledFeaturizer = new Convolver(filters, augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
         .andThen(SymmetricRectifier(alpha=conf.alpha))
         .andThen(new Pooler(conf.poolStride, conf.poolSize, identity, _.sum))
         .andThen(ImageVectorizer)
@@ -59,45 +69,61 @@ object RandomPatchCifar extends Serializable with Logging {
     val featurizer = unscaledFeaturizer.andThen(new StandardScaler, trainImages)
         .andThen(new Cacher[DenseVector[Double]])
 
-    val labelExtractor = LabelExtractor andThen
-      ClassLabelIndicatorsFromIntLabels(numClasses) andThen
-      new Cacher[DenseVector[Double]]
+    val labelExtractorVectorizer = LabelExtractor andThen ClassLabelIndicatorsFromIntLabels(numClasses)
 
-    val trainFeatures = featurizer(trainImages)
-    val trainLabels = labelExtractor(trainData)
+    val trainFeatures = featurizer(trainImagesAugmented)
+    val trainLabels = new LabelAugmenter(numRandomPatchesAugment).apply(LabelExtractor(trainData)).cache()
+    val trainLabelsVect = new LabelAugmenter(numRandomPatchesAugment).apply(labelExtractorVectorizer(trainData)).cache()
 
-    val model = new BlockLeastSquaresEstimator(4096, 1, conf.lambda.getOrElse(0.0)).fit(trainFeatures, trainLabels)
+    val model = new BlockLeastSquaresEstimator(4096, 1,
+      conf.lambda.getOrElse(0.0)).fit(trainFeatures, trainLabelsVect)
 
     val predictionPipeline = featurizer andThen model andThen MaxClassifier andThen new Cacher[Int]
 
     // Calculate training error.
     val trainEval = MulticlassClassifierEvaluator(
-      predictionPipeline(trainImages), LabelExtractor(trainData), numClasses)
+      predictionPipeline(trainImagesAugmented), trainLabels, numClasses)
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
     val testImages = ImageExtractor(testData)
-    val testLabels = labelExtractor(testData)
+    val testImagesAugmented = new RandomFlips(numRandomPatchesAugment, augmentRandomPatchSize, centerCorners=true).apply(testImages)
+    val testLabels = new LabelAugmenter(numTestAugment).apply(LabelExtractor(testData))
 
-    val testEval = MulticlassClassifierEvaluator(predictionPipeline(testImages), LabelExtractor(testData), numClasses)
+    val testEval = MulticlassClassifierEvaluator(predictionPipeline(testImagesAugmented), testLabels, numClasses)
 
     logInfo(s"Training error is: ${trainEval.totalError}")
     logInfo(s"Test error is: ${testEval.totalError}")
+
+    // gotta love spark
+    // val trainImageIds = trainImages.zipWithIndex.map(x => x._2.toInt)
+    // val trainImageIdsAugmented = new LabelAugmenter(numRandomPatchesAugment).apply(trainImageIds)
+    // trainLabels.zip(trainImageIdsAugmented).zip(trainFeatures.map(_.toArray)).map { case (labelIdx, data) =>
+    //   labelIdx._2 + ".jpg," + labelIdx._1 + "," + data.mkString(",")
+    // }.saveAsTextFile(conf.trainOutfile)
+    
+    // val testImageIds = testImages.zipWithIndex.map(x => x._2.toInt)
+    // val testImageIdsAugmented = new LabelAugmenter(numTestAugment).apply(testImageIds)
+    // testLabels.zip(testImageIdsAugmented).zip(testFeatures.map(_.toArray)).map { case (labelIdx, data) =>
+    //   labelIdx._2 + ".jpg," + labelIdx._1 + "," + data.mkString(",")
+    // }.saveAsTextFile(conf.testOutfile)
   }
 
-  case class RandomCifarConfig(
+  case class RandomCifarFeaturizerConfig(
       trainLocation: String = "",
       testLocation: String = "",
+      trainOutfile: String = "",
+      testOutfile: String = "",
       numFilters: Int = 100,
       patchSize: Int = 6,
       patchSteps: Int = 1,
-      poolSize: Int = 14,
-      poolStride: Int = 13,
+      poolSize: Int = 10,
+      poolStride: Int = 9,
       alpha: Double = 0.25,
       lambda: Option[Double] = None,
-      sampleFrac: Option[Double] = None)
+      numRandomPatchesAugment: Int = 10)
 
-  def parse(args: Array[String]): RandomCifarConfig = new OptionParser[RandomCifarConfig](appName) {
+  def parse(args: Array[String]): RandomCifarFeaturizerConfig = new OptionParser[RandomCifarFeaturizerConfig](appName) {
     head(appName, "0.1")
     help("help") text("prints this usage text")
     opt[String]("trainLocation") required() action { (x,c) => c.copy(trainLocation=x) }
@@ -106,10 +132,10 @@ object RandomPatchCifar extends Serializable with Logging {
     opt[Int]("patchSize") action { (x,c) => c.copy(patchSize=x) }
     opt[Int]("patchSteps") action { (x,c) => c.copy(patchSteps=x) }
     opt[Int]("poolSize") action { (x,c) => c.copy(poolSize=x) }
+    opt[Int]("numRandomPatchesAugment") action { (x,c) => c.copy(numRandomPatchesAugment=x) }
     opt[Double]("alpha") action { (x,c) => c.copy(alpha=x) }
     opt[Double]("lambda") action { (x,c) => c.copy(lambda=Some(x)) }
-    opt[Double]("sampleFrac") action { (x,c) => c.copy(sampleFrac=Some(x)) }
-  }.parse(args, RandomCifarConfig()).get
+  }.parse(args, RandomCifarFeaturizerConfig()).get
 
   /**
    * The actual driver receives its configuration parameters from spark-submit usually.
