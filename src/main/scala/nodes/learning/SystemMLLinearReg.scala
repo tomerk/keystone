@@ -72,6 +72,9 @@ class SystemMLLinearReg[T <: Vector[Double]](scriptLocation: String, numFeatures
 
     featuresMatrix.count()
     labelsMatrix.count()
+
+    data.unpersist()
+    labels.unpersist()
     val endConversionTime = System.currentTimeMillis()
     logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
