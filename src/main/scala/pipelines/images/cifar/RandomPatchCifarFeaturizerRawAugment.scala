@@ -4,7 +4,7 @@ import scala.reflect.ClassTag
 
 import breeze.linalg._
 import breeze.numerics._
-import evaluation.MulticlassClassifierEvaluator
+import evaluation.{AugmentedExamplesEvaluator, MulticlassClassifierEvaluator}
 import loaders.CifarLoader
 import nodes.images._
 import nodes.learning.{BlockLeastSquaresEstimator, ZCAWhitener, ZCAWhitenerEstimator}
@@ -42,6 +42,9 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
     val trainImages = ImageExtractor.andThen(new Cacher[Image](Some("trainImages"))).apply(trainData)
     val trainImagesAugmented = randomFlipper(trainImages)
 
+    val trainImageIds = trainImages.zipWithIndex.map(x => x._2.toInt)
+    val trainImageIdsAugmented = new LabelAugmenter(numRandomPatchesAugment).apply(trainImageIds)
+
     val patchExtractor = new Windower(conf.patchSteps, conf.patchSize)
       .andThen(ImageVectorizer.apply)
       .andThen(new Sampler(whitenerSize))
@@ -78,32 +81,30 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
     val model = new BlockLeastSquaresEstimator(4096, 1,
       conf.lambda.getOrElse(0.0)).fit(trainFeatures, trainLabelsVect)
 
-    val predictionPipeline = featurizer andThen model andThen MaxClassifier andThen new Cacher[Int]
+    val predictionPipeline = featurizer andThen model andThen new Cacher[DenseVector[Double]]
 
     // Calculate training error.
-    val trainEval = MulticlassClassifierEvaluator(
-      predictionPipeline(trainImagesAugmented), trainLabels, numClasses)
+    val trainEval = AugmentedExamplesEvaluator(
+      trainImageIdsAugmented, predictionPipeline(trainImagesAugmented), trainLabels, numClasses)
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
     val testImages = ImageExtractor(testData)
     val testImagesAugmented = new RandomFlips(numRandomPatchesAugment, augmentRandomPatchSize, centerCorners=true).apply(testImages)
     val testLabels = new LabelAugmenter(numTestAugment).apply(LabelExtractor(testData))
+    val testImageIds = testImages.zipWithIndex.map(x => x._2.toInt)
+    val testImageIdsAugmented = new LabelAugmenter(numTestAugment).apply(testImageIds)
 
-    val testEval = MulticlassClassifierEvaluator(predictionPipeline(testImagesAugmented), testLabels, numClasses)
+    val testEval = AugmentedExamplesEvaluator(testImageIdsAugmented, predictionPipeline(testImagesAugmented), testLabels, numClasses)
 
     logInfo(s"Training error is: ${trainEval.totalError}")
     logInfo(s"Test error is: ${testEval.totalError}")
 
     // gotta love spark
-    // val trainImageIds = trainImages.zipWithIndex.map(x => x._2.toInt)
-    // val trainImageIdsAugmented = new LabelAugmenter(numRandomPatchesAugment).apply(trainImageIds)
     // trainLabels.zip(trainImageIdsAugmented).zip(trainFeatures.map(_.toArray)).map { case (labelIdx, data) =>
     //   labelIdx._2 + ".jpg," + labelIdx._1 + "," + data.mkString(",")
     // }.saveAsTextFile(conf.trainOutfile)
     
-    // val testImageIds = testImages.zipWithIndex.map(x => x._2.toInt)
-    // val testImageIdsAugmented = new LabelAugmenter(numTestAugment).apply(testImageIds)
     // testLabels.zip(testImageIdsAugmented).zip(testFeatures.map(_.toArray)).map { case (labelIdx, data) =>
     //   labelIdx._2 + ".jpg," + labelIdx._1 + "," + data.mkString(",")
     // }.saveAsTextFile(conf.testOutfile)
