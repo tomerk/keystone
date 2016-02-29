@@ -38,7 +38,7 @@ object RandomPatchCifar extends Serializable with Logging {
     val (filters, whitener): (DenseMatrix[Double], ZCAWhitener) = {
         val baseFilters = patchExtractor(trainImages)
         val baseFilterMat = Stats.normalizeRows(MatrixUtils.rowsToMatrix(baseFilters), 10.0)
-        val whitener = new ZCAWhitenerEstimator().fitSingle(baseFilterMat)
+        val whitener = new ZCAWhitenerEstimator(1e-1).fitSingle(baseFilterMat)
 
         //Normalize them.
         val sampleFilters = MatrixUtils.sampleRows(baseFilterMat, conf.numFilters)
