@@ -9,15 +9,18 @@ import utils.{ImageMetadata, ChannelMajorArrayVectorizedImage, Image}
 /**
  * @param numPatches Number of random patches to create for each image.
  * @param windowDim Dimension of the window (24 for CIFAR)
+ * @param testData if the random flips are for test data
+ * @param centerOnly if the random flips for test data should only give the center patch
  */
 class RandomFlips(
     numPatches: Int,
     windowDim: Int,
-    centerCorners: Boolean = false) extends FunctionNode[RDD[Image], RDD[Image]] {
+    testData: Boolean,
+    centerOnly: Boolean) extends FunctionNode[RDD[Image], RDD[Image]] {
 
   def apply(in: RDD[Image]) = {
-    if (centerCorners) {
-      in.flatMap(getCroppedTestImages)
+    if (testData) {
+      in.flatMap(getCroppedTestImages(_, centerOnly))
     } else {
       in.flatMap(getCroppedImages)
     }
@@ -76,7 +79,7 @@ class RandomFlips(
    * Get the 4 corner images as well as the center image of size windowDim x windowDim
    * and their flips
    */
-  def getCroppedTestImages(image: Image) = {
+  def getCroppedTestImages(image: Image, centerOnly: Boolean) = {
     val xDim = image.metadata.xDim
     val yDim = image.metadata.yDim
     val numChannels = image.metadata.numChannels
@@ -84,8 +87,17 @@ class RandomFlips(
     // Assume x is vertical axis and y is horizontal axis
     // These are the start indices for the upperLeft, lowerLeft, upperRight, lowerRight,
     // and center image (in that order)
-    val startXs = Array(0, xDim-windowDim, 0, xDim-windowDim, (xDim-windowDim)/2) 
-    val startYs = Array(0, 0, yDim-windowDim, yDim-windowDim, (yDim-windowDim)/2)
+    val startXs = if (centerOnly) {
+      Array((xDim-windowDim)/2) 
+    } else {
+      Array(0, xDim-windowDim, 0, xDim-windowDim, (xDim-windowDim)/2) 
+    }
+
+    val startYs = if (centerOnly) {
+      Array((yDim-windowDim)/2)
+    } else {
+      Array(0, 0, yDim-windowDim, yDim-windowDim, (yDim-windowDim)/2)
+    }
 
     (0 until startXs.length).flatMap { i =>
       val randomPatch = new DenseVector[Double](windowDim * windowDim * numChannels)
