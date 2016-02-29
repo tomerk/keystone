@@ -5,7 +5,6 @@ import edu.berkeley.cs.amplab.mlmatrix.{RowPartition, NormalEquations, BlockCoor
 import nodes.stats.{StandardScalerModel, StandardScaler}
 import org.apache.spark.rdd.RDD
 import nodes.util.{VectorSplitter, Identity}
-import pipelines.Logging
 import utils.{MatrixUtils, Stats}
 import workflow.{Transformer, LabelEstimator}
 
@@ -14,7 +13,6 @@ import workflow.{Transformer, LabelEstimator}
  * Transformer that applies a linear model to an input.
  * Different from [[LinearMapper]] in that the matrix representing the transformation
  * is split into a seq.
- *
  * @param xs  The chunks of the matrix representing the linear model
  * @param blockSize blockSize to split data before applying transformations
  * @param bOpt optional intercept term to be added
@@ -34,7 +32,6 @@ class BlockLinearMapper(
 
   /**
    * Applies the linear model to feature vectors large enough to have been split into several RDDs.
- *
    * @param in RDD of vectors to apply the model to
    * @return the output vectors
    */
@@ -44,7 +41,6 @@ class BlockLinearMapper(
 
   /**
    * Applies the linear model to feature vectors large enough to have been split into several RDDs.
- *
    * @param ins RDD of vectors to apply the model to, split into same size as model blocks
    * @return the output vectors
    */
@@ -93,7 +89,6 @@ class BlockLinearMapper(
 
   /**
    * Applies the linear model to feature vectors. After processing chunk i of every vector, applies
- *
    * @param evaluator to the intermediate output vector.
    * @param in input RDD
    */
@@ -103,7 +98,6 @@ class BlockLinearMapper(
 
   /**
    * Applies the linear model to feature vectors. After processing chunk i of every vector, applies
- *
    * @param evaluator to the intermediate output vector.
    * @param in sequence of input RDD chunks
    */
@@ -201,13 +195,12 @@ object BlockLeastSquaresEstimator {
 /**
  * Fits a least squares model using block coordinate descent with provided
  * training features and labels
- *
  * @param blockSize size of block to use in the solver
  * @param numIter number of iterations of solver to run
  * @param lambda L2-regularization to use
  */
 class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 0.0)
-  extends LabelEstimator[DenseVector[Double], DenseVector[Double], DenseVector[Double]] with Logging {
+  extends LabelEstimator[DenseVector[Double], DenseVector[Double], DenseVector[Double]] {
 
   /**
    * Fit a model using blocks of features and labels provided.
@@ -228,21 +221,10 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
     val numClasses = trainingLabels.first.length
 
     if (numClasses == 2) {
-      val startConversionTime = System.currentTimeMillis()
-
-      val labelsZmOneClass = labelScaler.apply(trainingLabels).map(x => x(0)).cache()
-      labelsZmOneClass.count()
-      trainingLabels.unpersist()
-
+      val labelsZmOneClass = labelScaler.apply(trainingLabels).map(x => x(0))
       val featuresZm = trainingFeatures.zip(featureScalers).map { case (rdd, scaler) =>
-        scaler.apply(rdd).cache()
+        scaler.apply(rdd)
       }
-
-      featuresZm.foreach(_.count())
-      trainingFeatures.foreach(_.unpersist())
-
-      val endConversionTime = System.currentTimeMillis()
-      logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
       val model = BinaryBlockCoordinateDescent.trainSingleClassLS(
         blockSize, numIter, lambda, featuresZm, labelsZmOneClass)
