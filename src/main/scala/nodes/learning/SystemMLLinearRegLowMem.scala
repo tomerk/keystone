@@ -4,6 +4,7 @@ import breeze.linalg.{*, DenseVector, DenseMatrix, Vector}
 import nodes.stats.{StandardScaler, StandardScalerModel}
 import org.apache.spark.api.java.{JavaPairRDD, JavaSparkContext}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.storage.StorageLevel
 import org.apache.sysml.api.MLContext
 import org.apache.sysml.runtime.instructions.spark.utils.RDDConverterUtils
 import org.apache.sysml.runtime.matrix.MatrixCharacteristics
@@ -62,13 +63,18 @@ class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFe
       new JavaSparkContext(sc),
       new JavaPairRDD(featuresToMatrixCell),
       mc,
-      false)
+      false).persist(StorageLevel.DISK_ONLY)
 
     val labelsMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
       new JavaSparkContext(sc),
       new JavaPairRDD(labelsToMatrixCell),
       labelsMC,
-      false)
+      false).persist(StorageLevel.DISK_ONLY)
+
+    featuresMatrix.count()
+    labelsMatrix.count()
+    val endConversionTime = System.currentTimeMillis()
+    logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
     ml.reset()
     ml.setConfig("defaultblocksize", s"$blockSize")
