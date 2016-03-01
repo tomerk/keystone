@@ -63,13 +63,13 @@ class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFe
       new JavaSparkContext(sc),
       new JavaPairRDD(featuresToMatrixCell),
       mc,
-      false).persist(StorageLevel.DISK_ONLY)
+      false)//.persist(StorageLevel.DISK_ONLY)
 
     val labelsMatrix = RDDConverterUtils.binaryCellToBinaryBlock(
       new JavaSparkContext(sc),
       new JavaPairRDD(labelsToMatrixCell),
       labelsMC,
-      false).persist(StorageLevel.DISK_ONLY)
+      false)//.persist(StorageLevel.DISK_ONLY)
 
     featuresMatrix.count()
     labelsMatrix.count()
