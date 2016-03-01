@@ -10,6 +10,7 @@ import workflow.Transformer
 
 /**
  * Transformer that extracts random cosine features from a feature vector
+ *
  * @param W A matrix of dimension (# output features) by (# input features)
  * @param b a dense vector of dimension (# output features)
  *
@@ -24,11 +25,16 @@ class CosineRandomFeatures(
   require(b.length == W.rows, "# of rows in W and size of b should match")
   override def apply(in: RDD[DenseVector[Double]]): RDD[DenseVector[Double]] = {
     in.mapPartitions { part =>
-      val data = MatrixUtils.rowsToMatrix(part)
-      val features: DenseMatrix[Double] = data * W.t
-      features(*,::) :+= b
-      cos.inPlace(features)
-      MatrixUtils.matrixToRowArray(features).iterator
+      if (!part.hasNext) {
+        Iterator.empty
+      } else {
+        val data = MatrixUtils.rowsToMatrix(part)
+
+        val features: DenseMatrix[Double] = data * W.t
+        features(*, ::) :+= b
+        cos.inPlace(features)
+        MatrixUtils.matrixToRowArray(features).iterator
+      }
     }
   }
 
