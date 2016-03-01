@@ -70,10 +70,6 @@ class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFe
       labelsMC,
       false)
 
-    featuresMatrix.count()
-    labelsMatrix.count()
-    val endConversionTime = System.currentTimeMillis()
-
     ml.reset()
     ml.setConfig("defaultblocksize", s"$blockSize")
     ml.registerInput("X", featuresMatrix, mc)
