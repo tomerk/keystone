@@ -17,6 +17,8 @@
 
 package nodes.learning
 
+import org.apache.spark.storage.StorageLevel
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -39,6 +41,7 @@ import utils.{MatrixUtils, Stats}
  * :: DeveloperApi ::
  * Class used to solve an optimization problem using Limited-memory BFGS.
  * Reference: [[http://en.wikipedia.org/wiki/Limited-memory_BFGS]]
+ *
  * @param gradient Gradient function to be used.
  * @param numCorrections 3 < numCorrections < 10 is recommended.
  * @param convergenceTol convergence tolerance for L-BFGS
@@ -96,11 +99,11 @@ object LBFGSwithL2 extends Logging {
 
     val dataMat = featureScaler.apply(data).mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
-    }.cache()
+    }.persist(StorageLevel.MEMORY_AND_DISK)
 
     val labelsMat = labelScaler.apply(labels).mapPartitions { part =>
       Iterator.single(MatrixUtils.rowsToMatrix(part))
-    }.cache()
+    }.persist(StorageLevel.MEMORY_AND_DISK)
 
     dataMat.count()
     labelsMat.count()
