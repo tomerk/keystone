@@ -5,7 +5,7 @@ import breeze.numerics._
 import org.apache.spark.rdd.RDD
 import nodes.util.{MaxClassifier}
 
-object AugmentedExamplesEvaluator {
+object AugmentedExamplesEvaluator extends Serializable {
 
   def averagePolicy(preds: Array[DenseVector[Double]]): DenseVector[Double] = {
     preds.reduce(_ + _) :/ preds.size.toDouble
