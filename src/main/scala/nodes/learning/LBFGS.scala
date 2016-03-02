@@ -75,6 +75,33 @@ class LBFGSwithL2(
 
 }
 
+class LBFGSwithL2LowMem(
+                   val gradient: BatchGradient,
+                   val numCorrections: Int  = 10,
+                   val convergenceTol: Double = 1e-4,
+                   val numIterations: Int = 100,
+                   val regParam: Double = 0.0)
+  extends LabelEstimator[DenseVector[Double], DenseVector[Double], DenseVector[Double]] {
+
+  def fit(data: RDD[DenseVector[Double]], labels: RDD[DenseVector[Double]]): LinearMapper = {
+    val featureScaler = new StandardScaler(normalizeStdDev = false).fit(data)
+    val labelScaler = new StandardScaler(normalizeStdDev = false).fit(labels)
+
+    val model = LBFGSwithL2.runLBFGSLowMem(
+      data,
+      labels,
+      featureScaler,
+      labelScaler,
+      gradient,
+      numCorrections,
+      convergenceTol,
+      numIterations,
+      regParam)
+    new LinearMapper(model, Some(labelScaler.mean), Some(featureScaler))
+  }
+
+}
+
 object LBFGSwithL2 extends Logging {
   /**
    * Run Limited-memory BFGS (L-BFGS) in parallel.
@@ -110,6 +137,66 @@ object LBFGSwithL2 extends Logging {
 
     data.unpersist()
     labels.unpersist()
+    val endConversionTime = System.currentTimeMillis()
+    logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
+
+    val numFeatures = dataMat.map(_.cols).collect().head
+    val numClasses = labelsMat.map(_.cols).collect().head
+
+    val costFun = new CostFun(dataMat, labelsMat, gradient, regParam, numExamples, numFeatures,
+      numClasses)
+
+    val lbfgs = new BreezeLBFGS[DenseVector[Double]](maxNumIterations, numCorrections, convergenceTol)
+
+    val initialWeights = DenseVector.zeros[Double](numFeatures * numClasses)
+
+    val states =
+      lbfgs.iterations(new CachedDiffFunction(costFun), initialWeights)
+
+    /**
+     * NOTE: lossSum and loss is computed using the weights from the previous iteration
+     * and regVal is the regularization value computed in the previous iteration as well.
+     */
+    var state = states.next()
+    while (states.hasNext) {
+      lossHistory += state.value
+      state = states.next()
+    }
+    lossHistory += state.value
+    val finalWeights = state.x.asDenseMatrix.reshape(numFeatures, numClasses)
+
+    val lossHistoryArray = lossHistory.result()
+
+    logInfo("LBFGS.runLBFGS finished. Last 10 losses %s".format(
+      lossHistoryArray.takeRight(10).mkString(", ")))
+
+    finalWeights
+  }
+
+  def runLBFGSLowMem(
+                data: RDD[DenseVector[Double]],
+                labels: RDD[DenseVector[Double]],
+                featureScaler: StandardScalerModel,
+                labelScaler: StandardScalerModel,
+                gradient: BatchGradient,
+                numCorrections: Int,
+                convergenceTol: Double,
+                maxNumIterations: Int,
+                regParam: Double): DenseMatrix[Double] = {
+
+    val lossHistory = mutable.ArrayBuilder.make[Double]
+    val numExamples = data.count
+
+    val startConversionTime = System.currentTimeMillis()
+
+    val dataMat = featureScaler.apply(data).mapPartitions { part =>
+      Iterator.single(MatrixUtils.rowsToMatrix(part))
+    }
+
+    val labelsMat = labelScaler.apply(labels).mapPartitions { part =>
+      Iterator.single(MatrixUtils.rowsToMatrix(part))
+    }
+
     val endConversionTime = System.currentTimeMillis()
     logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 

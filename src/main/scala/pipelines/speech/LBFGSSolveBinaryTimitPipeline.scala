@@ -75,7 +75,7 @@ object LBFGSSolveBinaryTimitPipeline extends Logging {
     featurizedTrainData.count()
 
     val solveStartTime = System.currentTimeMillis()
-    val model = new LBFGSwithL2(new LeastSquaresBatchGradient, numIterations=20).fit(featurizedTrainData, trainLabels)
+    val model = new LBFGSwithL2LowMem(new LeastSquaresBatchGradient, numIterations=20).fit(featurizedTrainData, trainLabels)
 
     val solveEndTime  = System.currentTimeMillis()
 
