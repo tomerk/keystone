@@ -28,7 +28,7 @@ class BlockLinearMapper(
   // Use identity nodes if we don't need to do scaling
   val featureScalers = featureScalersOpt.getOrElse(
     Seq.fill(xs.length)(new Identity[DenseVector[Double]]))
-  val vectorSplitter = new VectorSplitter(blockSize)
+  val vectorSplitter = new VectorSplitter(blockSize, Some(xs.map(_.rows).reduceLeft(_ + _)))
 
   /**
    * Applies the linear model to feature vectors large enough to have been split into several RDDs.
@@ -199,7 +199,7 @@ object BlockLeastSquaresEstimator {
  * @param numIter number of iterations of solver to run
  * @param lambda L2-regularization to use
  */
-class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 0.0)
+class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 0.0, useIntercept: Boolean = true)
   extends LabelEstimator[DenseVector[Double], DenseVector[Double], DenseVector[Double]] {
 
   /**
@@ -211,19 +211,26 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
   def fit(
       trainingFeatures: Seq[RDD[DenseVector[Double]]],
       trainingLabels: RDD[DenseVector[Double]]): BlockLinearMapper = {
-    val labelScaler = new StandardScaler(normalizeStdDev = false).fit(trainingLabels)
-    // NOTE: This will cause trainingFeatures to be evaluated twice
-    // which might not be optimal if its not cached ?
-    val featureScalers = trainingFeatures.map { rdd =>
-      new StandardScaler(normalizeStdDev = false).fit(rdd)
+    val (featureScalers, labelScaler) = if (useIntercept) {
+      val lSVal = new StandardScaler(normalizeStdDev = false).fit(trainingLabels)
+      // NOTE: This will cause trainingFeatures to be evaluated twice
+      // which might not be optimal if its not cached ?
+      val fSVal = trainingFeatures.map { rdd =>
+        Some(new StandardScaler(normalizeStdDev = false).fit(rdd))
+      }
+      (fSVal, Some(lSVal))
+    } else {
+      (Seq.fill(trainingFeatures.size)(None), None)
     }
 
     val numClasses = trainingLabels.first.length
 
     if (numClasses == 2) {
-      val labelsZmOneClass = labelScaler.apply(trainingLabels).map(x => x(0))
+      val labelsZmOneClass = labelScaler.map(x => x(trainingLabels)).getOrElse(trainingLabels).map(x => x(0)) 
+      // val labelsZmOneClass = labelScaler.apply(trainingLabels).map(x => x(0))
       val featuresZm = trainingFeatures.zip(featureScalers).map { case (rdd, scaler) =>
-        scaler.apply(rdd)
+        scaler.map(x => x(rdd)).getOrElse(rdd)
+        // scaler.apply(rdd)
       }
 
       val model = BinaryBlockCoordinateDescent.trainSingleClassLS(
@@ -238,17 +245,18 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
         twoClassModel(idx) = mat
       }
 
-      new BlockLinearMapper(twoClassModel.toSeq, blockSize, Some(labelScaler.mean), Some(featureScalers))
+      new BlockLinearMapper(twoClassModel.toSeq, blockSize, labelScaler.map(_.mean), 
+        if (useIntercept) Some(featureScalers.map(_.get)) else None )
 
     } else {
       // Find out numRows, numCols once
       val b = RowPartitionedMatrix.fromArray(
-        labelScaler.apply(trainingLabels).map(_.toArray)).cache()
+        labelScaler.map(x => x(trainingLabels)).getOrElse(trainingLabels).map(_.toArray)).cache()
       val numRows = Some(b.numRows())
       val numCols = Some(blockSize.toLong)
 
       val A = trainingFeatures.zip(featureScalers).map { case (rdd, scaler) =>
-        new RowPartitionedMatrix(scaler.apply(rdd).mapPartitions { rows =>
+        new RowPartitionedMatrix(scaler.map(x => x(rdd)).getOrElse(rdd).mapPartitions { rows =>
           Iterator.single(MatrixUtils.rowsToMatrix(rows))
         }.map(RowPartition), numRows, numCols)
       }
@@ -261,7 +269,8 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
         bcd.solveOnePassL2(A.iterator, b, Array(lambda), new NormalEquations()).toSeq.transpose
       }
 
-      new BlockLinearMapper(models.head, blockSize, Some(labelScaler.mean), Some(featureScalers))
+      new BlockLinearMapper(models.head, blockSize, labelScaler.map(_.mean),
+        if (useIntercept) Some(featureScalers.map(_.get)) else None)
     }
   }
 
