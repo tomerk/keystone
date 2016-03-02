@@ -69,8 +69,14 @@ object MatrixUtils extends Serializable {
    * @return A matrix constructed from a sample of the rows.
    */
   def sampleRows(in: DenseMatrix[Double], numSamples: Int): DenseMatrix[Double] = {
-    val rows = Random.shuffle(0 to (in.rows-1)).take(numSamples).sorted
-    (in(rows,::)).toDenseMatrix
+    val rows = Random.shuffle(0 to (in.rows-1)).take(numSamples) // .sorted
+    val outShuffle = new DenseMatrix[Double](numSamples, in.cols)
+    var i = 0
+    while (i < numSamples) {
+      outShuffle(i, ::) := in(rows(i), ::)
+      i = i + 1
+    }
+    outShuffle
   }
 
   // In place deterministic shuffle
