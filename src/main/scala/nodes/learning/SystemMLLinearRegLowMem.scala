@@ -16,7 +16,7 @@ import workflow.{Transformer, LabelEstimator}
 /**
  * Created by tomerk11 on 2/22/16.
  */
-class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFeatures: Int, numIters: Double, useIntercept: Boolean = false, blockSize: Int = 1024) extends LabelEstimator[T, Boolean, Boolean] with Logging {
+class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFeatures: Int, numIters: Double, numRows: Long, useIntercept: Boolean = false, blockSize: Int = 1024) extends LabelEstimator[T, Boolean, Boolean] with Logging {
   /**
    * A LabelEstimator estimator is an estimator which expects labeled data.
    *
@@ -53,7 +53,6 @@ class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFe
     val sc = data.sparkContext
     val ml = new MLContext(sc)
 
-    val numRows = data.count()
     val numCols = numFeatures
 
     val mc = new MatrixCharacteristics(numRows, numCols, blockSize, blockSize)
@@ -71,8 +70,6 @@ class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFe
       labelsMC,
       false)//.persist(StorageLevel.DISK_ONLY)
 
-    featuresMatrix.count()
-    labelsMatrix.count()
     val endConversionTime = System.currentTimeMillis()
     logInfo(s"PIPELINE TIMING: Finished System Conversion And Transfer in ${endConversionTime - startConversionTime} ms")
 
@@ -91,9 +88,6 @@ class SystemMLLinearRegLowMem[T <: Vector[Double]](scriptLocation: String, numFe
       "icpt" -> "0",
       "maxi" -> s"$numIters")
     val outputBlocks = ml.execute(scriptLocation, nargs).getBinaryBlockedRDD("beta_out").rdd.collect()
-
-    featuresMatrix.unpersist()
-    labelsMatrix.unpersist()
 
     val maxR = {
       val maxRBlock = outputBlocks.maxBy(_._1.getRowIndex)

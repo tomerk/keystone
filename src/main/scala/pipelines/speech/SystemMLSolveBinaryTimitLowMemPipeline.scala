@@ -74,11 +74,11 @@ object SystemMLSolveBinaryTimitLowMemPipeline extends Logging {
     }
 
     val featurizedTrainData = featurizer(trainData)
-    trainDataAndLabels.count()
+    val numRows = trainDataAndLabels.count()
 
     logInfo("PIPELINE TIMING: Starting the Solve")
     val solveStartTime = System.currentTimeMillis()
-    val solver = new SystemMLLinearRegLowMem[DenseVector[Double]](conf.scriptLocation, numCosineFeatures * numCosineBatches, conf.numEpochs, useIntercept = true)
+    val solver = new SystemMLLinearRegLowMem[DenseVector[Double]](conf.scriptLocation, numCosineFeatures * numCosineBatches, conf.numEpochs, numRows = numRows, useIntercept = true)
     val model = solver.fit(featurizedTrainData, labels)
 
     val solveEndTime  = System.currentTimeMillis()
