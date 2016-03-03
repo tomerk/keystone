@@ -77,7 +77,7 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
     val trainLabels = new LabelAugmenter(numRandomPatchesAugment).apply(LabelExtractor(trainData)).cache()
     val trainLabelsVect = new LabelAugmenter(numRandomPatchesAugment).apply(labelExtractorVectorizer(trainData)).cache()
 
-    val trainFeatures = scalerModel(unscaledTrainFeats).map(x => DenseVector(MatrixUtils.shuffleArray(x.toArray)))
+    val trainFeatures = scalerModel(unscaledTrainFeats).map(x => DenseVector(MatrixUtils.shuffleArray(x.toArray))).cache()
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
