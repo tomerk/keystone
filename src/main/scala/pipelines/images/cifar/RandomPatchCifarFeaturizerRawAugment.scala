@@ -32,7 +32,6 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
     val whitenerSize = 100000
     val numRandomPatchesAugment = conf.numRandomPatchesAugment
     val augmentRandomPatchSize = 24
-    val numTestAugment = if (conf.testAugment) 10 else 1 // 4 corners, center and flips of each of the 5
 
     // Load up training data, and optionally sample.
     val trainData = CifarLoader(sc, conf.trainLocation).cache()
@@ -48,10 +47,10 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
 
     val patchExtractor = new Windower(conf.patchSteps, conf.patchSize)
       .andThen(ImageVectorizer.apply)
-      .andThen(new Sampler(whitenerSize))
+      .andThen(new Sampler(whitenerSize * numRandomPatchesAugment))
 
     val (filters, whitener): (DenseMatrix[Double], ZCAWhitener) = {
-        val baseFilters = patchExtractor(trainImages)
+        val baseFilters = patchExtractor(trainImagesAugmented)
         val baseFilterMat = Stats.normalizeRows(MatrixUtils.rowsToMatrix(baseFilters), 10.0)
         val whitener = new ZCAWhitenerEstimator(1e-1).fitSingle(baseFilterMat)
 
@@ -66,63 +65,65 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
 
     val unscaledFeaturizer = new Convolver(filters, augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
         .andThen(SymmetricRectifier(alpha=conf.alpha))
-        .andThen(new Pooler(conf.poolStride, conf.poolSize, identity, _.sum))
+        .andThen(new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector))
         .andThen(ImageVectorizer)
-        .andThen(new Cacher[DenseVector[Double]])
+        .andThen(new Cacher[DenseVector[Double]](Some("features")))
 
-    val featurizer = unscaledFeaturizer.andThen(new StandardScaler, trainImages)
-        .andThen(new Cacher[DenseVector[Double]])
+    val unscaledTrainFeats = unscaledFeaturizer(trainImagesAugmented)
+    val scalerModel = new StandardScaler().fit(unscaledTrainFeats)
 
     val labelExtractorVectorizer = LabelExtractor andThen ClassLabelIndicatorsFromIntLabels(numClasses)
 
-    val trainFeatures = featurizer(trainImagesAugmented)
     val trainLabels = new LabelAugmenter(numRandomPatchesAugment).apply(LabelExtractor(trainData)).cache()
     val trainLabelsVect = new LabelAugmenter(numRandomPatchesAugment).apply(labelExtractorVectorizer(trainData)).cache()
 
-    val model = new BlockLeastSquaresEstimator(4096, 1,
-      conf.lambda.getOrElse(0.0)).fit(trainFeatures, trainLabelsVect)
-
-    val predictionPipeline = featurizer andThen model andThen new Cacher[DenseVector[Double]]
-
-    // Calculate training error.
-    val trainEval = AugmentedExamplesEvaluator(
-      trainImageIdsAugmented, predictionPipeline(trainImagesAugmented), trainLabels, numClasses)
-    logInfo(s"Training error is: ${trainEval.totalError}")
+    val trainFeatures = scalerModel(unscaledTrainFeats).map(x => DenseVector(MatrixUtils.shuffleArray(x.toArray))).cache()
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
     val testImages = ImageExtractor(testData)
-    val testImagesAugmented = new RandomFlips(numRandomPatchesAugment, augmentRandomPatchSize,
-      true, !conf.testAugment).apply(testImages)
-    val testLabels = new LabelAugmenter(numTestAugment).apply(LabelExtractor(testData))
+
+    val numTestAugment = 10 // 4 corners, center and flips of each of the 5
+    val testImagesAugmented = new RandomFlips(numRandomPatchesAugment, augmentRandomPatchSize, true, false).apply(testImages)
+    val testLabelsAugmented = new LabelAugmenter(numTestAugment).apply(LabelExtractor(testData))
     val testImageIds = testImages.zipWithIndex.map(x => x._2.toInt)
     val testImageIdsAugmented = new LabelAugmenter(numTestAugment).apply(testImageIds)
 
-    val testEval = AugmentedExamplesEvaluator(testImageIdsAugmented, predictionPipeline(testImagesAugmented), testLabels, numClasses)
-    logInfo(s"Test error is: ${testEval.totalError}")
+    val testFeaturesAugmented = scalerModel(unscaledFeaturizer(testImagesAugmented)).map(x => DenseVector(MatrixUtils.shuffleArray(x.toArray)))
 
-    // gotta love spark
-    // trainLabels.zip(trainImageIdsAugmented).zip(trainFeatures.map(_.toArray)).map { case (labelIdx, data) =>
-    //   labelIdx._2 + ".jpg," + labelIdx._1 + "," + data.mkString(",")
-    // }.saveAsTextFile(conf.trainOutfile)
-    
-    // testLabels.zip(testImageIdsAugmented).zip(testFeatures.map(_.toArray)).map { case (labelIdx, data) =>
-    //   labelIdx._2 + ".jpg," + labelIdx._1 + "," + data.mkString(",")
-    // }.saveAsTextFile(conf.testOutfile)
+    val testImagesCenterOnly = new RandomFlips(numRandomPatchesAugment, augmentRandomPatchSize, true, true).apply(testImages)
+    val testLabelsCenterOnly = new LabelAugmenter(1).apply(LabelExtractor(testData))
+    val testImageIdsCenterOnly = new LabelAugmenter(1).apply(testImageIds)
+    val testFeaturesCenterOnly = scalerModel(unscaledFeaturizer(testImagesCenterOnly)).map(x => DenseVector(MatrixUtils.shuffleArray(x.toArray)))
+
+    val numFeatures = conf.numFilters * 2 * 4 // 4 pools, 2 for symm rectifier
+
+    val model = new BlockLeastSquaresEstimator(4096, 1,
+      conf.lambda.getOrElse(0.0), useIntercept=false).fit(trainFeatures, trainLabelsVect, Some(numFeatures))
+
+    // Lets do two tests here 
+    model.applyAndEvaluate(testFeaturesAugmented,
+      (predictions: RDD[DenseVector[Double]]) => {
+        val testEval = AugmentedExamplesEvaluator(testImageIdsAugmented, predictions, testLabelsAugmented, numClasses)
+        logInfo(s"Center+4 corners+Flip Test error is: ${testEval.totalError}")
+      })
+
+    model.applyAndEvaluate(testFeaturesCenterOnly,
+      (predictions: RDD[DenseVector[Double]]) => {
+        val testEval = AugmentedExamplesEvaluator(testImageIdsCenterOnly, predictions, testLabelsCenterOnly, numClasses)
+        logInfo(s"Center Only Test error is: ${testEval.totalError}")
+      })
   }
 
   case class RandomCifarFeaturizerConfig(
       trainLocation: String = "",
       testLocation: String = "",
-      trainOutfile: String = "",
-      testOutfile: String = "",
       numFilters: Int = 100,
       patchSize: Int = 6,
       patchSteps: Int = 1,
       poolSize: Int = 10,
       poolStride: Int = 9,
       alpha: Double = 0.25,
-      testAugment: Boolean = false,
       lambda: Option[Double] = None,
       numRandomPatchesAugment: Int = 10)
 
@@ -136,7 +137,6 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
     opt[Int]("patchSteps") action { (x,c) => c.copy(patchSteps=x) }
     opt[Int]("poolSize") action { (x,c) => c.copy(poolSize=x) }
     opt[Int]("numRandomPatchesAugment") action { (x,c) => c.copy(numRandomPatchesAugment=x) }
-    opt[Boolean]("testAugment") action { (x,c) => c.copy(testAugment=x) }
     opt[Double]("alpha") action { (x,c) => c.copy(alpha=x) }
     opt[Double]("lambda") action { (x,c) => c.copy(lambda=Some(x)) }
   }.parse(args, RandomCifarFeaturizerConfig()).get
@@ -150,6 +150,8 @@ object RandomPatchCifarFeaturizerRawAugment extends Serializable with Logging {
 
     val conf = new SparkConf().setAppName(appName)
     conf.setIfMissing("spark.master", "local[2]")
+    // NOTE: ONLY APPLICABLE IF YOU CAN DONE COPY-DIR
+    conf.remove("spark.jars")
     val sc = new SparkContext(conf)
     run(sc, appConfig)
 

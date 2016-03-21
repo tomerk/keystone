@@ -38,7 +38,7 @@ object RandomPatchCifar extends Serializable with Logging {
     val (filters, whitener): (DenseMatrix[Double], ZCAWhitener) = {
         val baseFilters = patchExtractor(trainImages)
         val baseFilterMat = Stats.normalizeRows(MatrixUtils.rowsToMatrix(baseFilters), 10.0)
-        val whitener = new ZCAWhitenerEstimator(1e-1).fitSingle(baseFilterMat)
+        val whitener = new ZCAWhitenerEstimator(eps=1e-1).fitSingle(baseFilterMat)
 
         //Normalize them.
         val sampleFilters = MatrixUtils.sampleRows(baseFilterMat, conf.numFilters)
@@ -46,40 +46,56 @@ object RandomPatchCifar extends Serializable with Logging {
         val unnormSq = pow(unnormFilters, 2.0)
         val twoNorms = sqrt(sum(unnormSq(*, ::)))
 
-        ((unnormFilters(::, *) / (twoNorms + 1e-10)) * whitener.whitener.t, whitener)
+        ((unnormFilters(::, *) / (twoNorms + 1e-20)) * whitener.whitener.t, whitener)
     }
 
-
-    val unscaledFeaturizer = new Convolver(filters, imageSize, imageSize, numChannels, Some(whitener), true)
+    val batchFeaturizer = (0 until filters.rows).grouped(conf.batchSize).map { fsIdxs =>
+      val minIdx = fsIdxs.min
+      val maxIdx = fsIdxs.max
+      val fs = filters(minIdx to maxIdx, ::)
+      val unscaledFeaturizer = new Convolver(fs, imageSize, imageSize, numChannels, Some(whitener), true)
         .andThen(SymmetricRectifier(alpha=conf.alpha))
         .andThen(new Pooler(conf.poolStride, conf.poolSize, identity, _.sum))
         .andThen(ImageVectorizer)
         .andThen(new Cacher[DenseVector[Double]])
-
-    val featurizer = unscaledFeaturizer.andThen(new StandardScaler, trainImages)
+      val featurizer = unscaledFeaturizer
+        .andThen(new StandardScaler, trainImages)
         .andThen(new Cacher[DenseVector[Double]])
+      featurizer
+    }.toSeq
 
     val labelExtractor = LabelExtractor andThen
       ClassLabelIndicatorsFromIntLabels(numClasses) andThen
       new Cacher[DenseVector[Double]]
 
-    val trainFeatures = featurizer(trainImages)
+    // val trainFeatures = featurizer(trainImages)
+    val trainingBatches = batchFeaturizer.map { x =>
+      x.apply(trainImages)
+    }
+
     val trainLabels = labelExtractor(trainData)
 
-    val model = new BlockLeastSquaresEstimator(4096, 1, conf.lambda.getOrElse(0.0)).fit(trainFeatures, trainLabels)
+    val numFeatures = conf.numFilters * 2 * 4 // 4 pools, 2 for symm rectifier
 
-    val predictionPipeline = featurizer andThen model andThen MaxClassifier andThen new Cacher[Int]
+    val model = new BlockLeastSquaresEstimator(4096, 1, conf.lambda.getOrElse(0.0), useIntercept=false).fit(trainingBatches, trainLabels)
+
+    val trainPredictionPipeline = model andThen MaxClassifier andThen new Cacher[Int]
+    // val predictionPipeline = featurizer andThen model andThen MaxClassifier andThen new Cacher[Int]
 
     // Calculate training error.
     val trainEval = MulticlassClassifierEvaluator(
-      predictionPipeline(trainImages), LabelExtractor(trainData), numClasses)
+      MaxClassifier(model(trainingBatches)), LabelExtractor(trainData), numClasses)
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
     val testImages = ImageExtractor(testData)
     val testLabels = labelExtractor(testData)
 
-    val testEval = MulticlassClassifierEvaluator(predictionPipeline(testImages), LabelExtractor(testData), numClasses)
+    val testBatches = batchFeaturizer.map { case x =>
+      x.apply(testImages)
+    }
+
+    val testEval = MulticlassClassifierEvaluator(MaxClassifier(model(testBatches)), LabelExtractor(testData), numClasses)
 
     logInfo(s"Training error is: ${trainEval.totalError}")
     logInfo(s"Test error is: ${testEval.totalError}")
@@ -93,6 +109,7 @@ object RandomPatchCifar extends Serializable with Logging {
       patchSteps: Int = 1,
       poolSize: Int = 14,
       poolStride: Int = 13,
+      batchSize: Int = 512,
       alpha: Double = 0.25,
       lambda: Option[Double] = None,
       sampleFrac: Option[Double] = None)
@@ -106,6 +123,7 @@ object RandomPatchCifar extends Serializable with Logging {
     opt[Int]("patchSize") action { (x,c) => c.copy(patchSize=x) }
     opt[Int]("patchSteps") action { (x,c) => c.copy(patchSteps=x) }
     opt[Int]("poolSize") action { (x,c) => c.copy(poolSize=x) }
+    opt[Int]("batchSize") action { (x,c) => c.copy(batchSize=x) }
     opt[Double]("alpha") action { (x,c) => c.copy(alpha=x) }
     opt[Double]("lambda") action { (x,c) => c.copy(lambda=Some(x)) }
     opt[Double]("sampleFrac") action { (x,c) => c.copy(sampleFrac=Some(x)) }
@@ -120,6 +138,8 @@ object RandomPatchCifar extends Serializable with Logging {
 
     val conf = new SparkConf().setAppName(appName)
     conf.setIfMissing("spark.master", "local[2]")
+    // NOTE: ONLY APPLICABLE IF YOU CAN DONE COPY-DIR
+    conf.remove("spark.jars")
     val sc = new SparkContext(conf)
     run(sc, appConfig)
 

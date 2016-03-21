@@ -129,12 +129,19 @@ class RandomFlips(
         }
         c = c + 1
       }
-      Iterator(
-        ChannelMajorArrayVectorizedImage(randomPatch.toArray,
-          ImageMetadata(windowDim, windowDim, numChannels)),
-        ChannelMajorArrayVectorizedImage(randomPatchFlipped.toArray,
-          ImageMetadata(windowDim, windowDim, numChannels))
-      )
+      if (centerOnly) {
+        Iterator(
+          ChannelMajorArrayVectorizedImage(randomPatch.toArray,
+            ImageMetadata(windowDim, windowDim, numChannels))
+        )
+      } else {
+        Iterator(
+          ChannelMajorArrayVectorizedImage(randomPatch.toArray,
+            ImageMetadata(windowDim, windowDim, numChannels)),
+          ChannelMajorArrayVectorizedImage(randomPatchFlipped.toArray,
+            ImageMetadata(windowDim, windowDim, numChannels))
+        )
+      }
     }
   }
 
