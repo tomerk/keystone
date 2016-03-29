@@ -195,8 +195,9 @@ object Pipeline {
 
   /**
    * TODO: DOCUMENT!
+   * FIXME: STILL BUGGY / doesn't chain right! needs to do some sort of andThen esque thing
    */
-  def tune[A, B : ClassTag, L](branches: Seq[Pipeline[A, B]], labels: RDD[L], evaluator: RDD[(L, B)] => Double): Pipeline[A, B] = {
+  def tune[A, B : ClassTag, L](branches: Seq[Pipeline[A, B]], labels: RDD[L], evaluator: (RDD[B], RDD[L]) => Double): Pipeline[A, B] = {
     // attach a value per branch to offset all existing node ids by.
     val branchesWithNodeOffsets = branches.scanLeft(0)(_ + _.nodes.size).zip(branches)
 
