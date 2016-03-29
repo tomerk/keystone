@@ -192,6 +192,40 @@ object Pipeline {
     val newSink = newNodes.size - 1
     Pipeline(newNodes, newDataDeps, newFitDeps, newSink)
   }
+
+  /**
+   * TODO: DOCUMENT!
+   */
+  def tune[A, B : ClassTag, L](branches: Seq[Pipeline[A, B]], labels: RDD[L], evaluator: RDD[(L, B)] => Double): Pipeline[A, B] = {
+    // attach a value per branch to offset all existing node ids by.
+    val branchesWithNodeOffsets = branches.scanLeft(0)(_ + _.nodes.size).zip(branches)
+
+    val newNodes = branches.map(_.nodes).reduceLeft(_ ++ _) :+ SourceNode(labels) :+ new ModelSelector[B, L](evaluator) :+ new DelegatingTransformerNode("TunedModel")
+
+    val newDataDeps = branchesWithNodeOffsets.map { case (offset, branch) =>
+      val dataDeps = branch.dataDeps
+      dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset))
+    }.reduceLeft(_ ++ _) :+
+      Seq() :+
+      branchesWithNodeOffsets.flatMap { case (offset, branch) =>
+        val sink = branch.sink
+        val branchIndex = if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset
+        val labelIndex = newNodes.size - 3
+        Seq(branchIndex, labelIndex)
+      } :+
+      branchesWithNodeOffsets.map { case (offset, branch) =>
+        val sink = branch.sink
+        if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset
+      }
+
+    val newFitDeps = branchesWithNodeOffsets.map { case (offset, branch) =>
+      val fitDeps = branch.fitDeps
+      fitDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset))
+    }.reduceLeft(_ ++ _) :+ None :+ None :+ Some(newNodes.size - 2)
+
+    val newSink = newNodes.size - 1
+    Pipeline(newNodes, newDataDeps, newFitDeps, newSink)
+  }
 }
 
 class PipelineWithFittedTransformer[A, B, C] private[workflow] (

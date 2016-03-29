@@ -70,9 +70,9 @@ private[workflow] class ConcretePipeline[A, B](
       case _: SourceNode =>
         throw new RuntimeException("Pipeline DAG error: Cannot have a fit dependency on a DataNode")
       case _: TransformerNode =>
-        throw new RuntimeException("Pipeline DAG error: Cannot have a data dependency on a Transformer")
+        throw new RuntimeException("Pipeline DAG error: Cannot have a fit dependency on a Transformer")
       case _: DelegatingTransformerNode =>
-        throw new RuntimeException("Pipeline DAG error: Cannot have a data dependency on a Transformer")
+        throw new RuntimeException("Pipeline DAG error: Cannot have a fit dependency on a Transformer")
       case estimator: EstimatorNode =>
         val nodeDataDeps = dataDeps(node).toIterator.map(x => rddDataEval(x, null))
         logInfo(s"Fitting '${estimator.label}' [$node]")
