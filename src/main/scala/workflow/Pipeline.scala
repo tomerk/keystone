@@ -195,34 +195,50 @@ object Pipeline {
 
   /**
    * TODO: DOCUMENT!
-   * FIXME: STILL BUGGY / doesn't chain right! needs to do some sort of andThen esque thing
+   * FIXME: SEEMS TO WORK BUT VERY HARD TO UNDERSTAND, CLEAN UP AND ADD COMMENTS!!!
    */
-  def tune[A, B : ClassTag, L](branches: Seq[Pipeline[A, B]], labels: RDD[L], evaluator: (RDD[B], RDD[L]) => Double): Pipeline[A, B] = {
+  def tune[A, B : ClassTag, L](branches: Seq[Pipeline[A, B]], data: RDD[A], labels: RDD[L], evaluator: (RDD[B], RDD[L]) => Double): Pipeline[A, B] = {
     // attach a value per branch to offset all existing node ids by.
     val branchesWithNodeOffsets = branches.scanLeft(0)(_ + _.nodes.size).zip(branches)
+    val extraBranchOffset = branchesWithNodeOffsets.last._1 + 1
 
-    val newNodes = branches.map(_.nodes).reduceLeft(_ ++ _) :+ SourceNode(labels) :+ new ModelSelector[B, L](evaluator) :+ new DelegatingTransformerNode("TunedModel")
+    val newNodes = branches.map(_.nodes).reduceLeft(_ ++ _) ++
+      branches.map(_.nodes).reduceLeft(_ ++ _) :+
+      new ModelSelector[B, L](evaluator) :+
+      SourceNode(data) :+
+      SourceNode(labels) :+
+      new DelegatingTransformerNode("TunedModel")
 
     val newDataDeps = branchesWithNodeOffsets.map { case (offset, branch) =>
       val dataDeps = branch.dataDeps
-      dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset))
-    }.reduceLeft(_ ++ _) :+
-      Seq() :+
+      val dataIndex = newNodes.size - 3
+      dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) dataIndex else x + offset))
+    }.reduceLeft(_ ++ _) ++
+      branchesWithNodeOffsets.map { case (offset, branch) =>
+        val dataDeps = branch.dataDeps
+        dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset + extraBranchOffset))
+      }.reduceLeft(_ ++ _) :+
       branchesWithNodeOffsets.flatMap { case (offset, branch) =>
         val sink = branch.sink
         val branchIndex = if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset
-        val labelIndex = newNodes.size - 3
+        val labelIndex = newNodes.size - 2
         Seq(branchIndex, labelIndex)
       } :+
+      Seq() :+
+      Seq() :+
       branchesWithNodeOffsets.map { case (offset, branch) =>
         val sink = branch.sink
-        if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset
+        if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset + extraBranchOffset
       }
 
     val newFitDeps = branchesWithNodeOffsets.map { case (offset, branch) =>
       val fitDeps = branch.fitDeps
       fitDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset))
-    }.reduceLeft(_ ++ _) :+ None :+ None :+ Some(newNodes.size - 2)
+    }.reduceLeft(_ ++ _) ++
+      branchesWithNodeOffsets.map { case (offset, branch) =>
+        val fitDeps = branch.fitDeps
+        fitDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset + extraBranchOffset))
+      }.reduceLeft(_ ++ _) :+ None :+ None :+ None :+ Some(newNodes.size - 4)
 
     val newSink = newNodes.size - 1
     Pipeline(newNodes, newDataDeps, newFitDeps, newSink)
