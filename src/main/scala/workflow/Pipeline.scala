@@ -195,13 +195,24 @@ object Pipeline {
 
   /**
    * TODO: DOCUMENT!
-   * FIXME: SEEMS TO WORK BUT VERY HARD TO UNDERSTAND, CLEAN UP AND ADD COMMENTS!!!
    */
-  def tune[A, B : ClassTag, L](branches: Seq[Pipeline[A, B]], data: RDD[A], labels: RDD[L], evaluator: (RDD[B], RDD[L]) => Double): Pipeline[A, B] = {
+  def tune[A, B : ClassTag, L](
+      branches: Seq[Pipeline[A, B]],
+      data: RDD[A],
+      labels: RDD[L],
+      evaluator: (RDD[B], RDD[L]) => Double
+    ): Pipeline[A, B] = {
     // attach a value per branch to offset all existing node ids by.
     val branchesWithNodeOffsets = branches.scanLeft(0)(_ + _.nodes.size).zip(branches)
-    val extraBranchOffset = branchesWithNodeOffsets.last._1 + 1
+    val numNodesInBranches = branches.map(_.nodes.size).sum
 
+    // The new nodes consist of:
+    // - all of the branches together twice, once for passing into a ModelSelector at train time, and one to pass into
+    //   the tuned decision transformer at test time.
+    // - A ModelSelector created with the evaluator, to select the optimal branch
+    // - A source node for the train eval data
+    // - A source node for the train eval labels
+    // - A delegating transformer to apply the tuning decision
     val newNodes = branches.map(_.nodes).reduceLeft(_ ++ _) ++
       branches.map(_.nodes).reduceLeft(_ ++ _) :+
       new ModelSelector[B, L](evaluator) :+
@@ -209,38 +220,56 @@ object Pipeline {
       SourceNode(labels) :+
       new DelegatingTransformerNode("TunedModel")
 
+    val delegatingTransformerIndex = newNodes.size - 1
+    val evalLabelsIndex = newNodes.size - 2
+    val evalDataIndex = newNodes.size - 3
+    val modelSelectorIndex = newNodes.size - 4
+
+    // When updating the data dependencies:
+    // - The first copy of the branches must be connected to the train eval data
+    // - The second copy of the branches must remain connected to the source
+    // - The model selector must be connected to the first set of branches (being fed by train eval data),
+    //   and to the train eval labels
+    // - The train eval data and labels require no data dependencies
+    // - The delegating transformer needs to be connected to the second set of branches, being fed by
+    //   Pipeline.Source
     val newDataDeps = branchesWithNodeOffsets.map { case (offset, branch) =>
       val dataDeps = branch.dataDeps
-      val dataIndex = newNodes.size - 3
-      dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) dataIndex else x + offset))
+      dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) evalDataIndex else x + offset))
     }.reduceLeft(_ ++ _) ++
       branchesWithNodeOffsets.map { case (offset, branch) =>
         val dataDeps = branch.dataDeps
-        dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset + extraBranchOffset))
+        dataDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset + numNodesInBranches))
       }.reduceLeft(_ ++ _) :+
       branchesWithNodeOffsets.flatMap { case (offset, branch) =>
         val sink = branch.sink
         val branchIndex = if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset
-        val labelIndex = newNodes.size - 2
-        Seq(branchIndex, labelIndex)
+        Seq(branchIndex, evalLabelsIndex)
       } :+
       Seq() :+
       Seq() :+
       branchesWithNodeOffsets.map { case (offset, branch) =>
         val sink = branch.sink
-        if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset + extraBranchOffset
+        if (sink == Pipeline.SOURCE) Pipeline.SOURCE else sink + offset + numNodesInBranches
       }
 
+    // The fit dependencies must be updated for both sets of branches given the new node ids.
+    // The only new fit dependency to be added is from the delegating transformer to the ModelSelector
     val newFitDeps = branchesWithNodeOffsets.map { case (offset, branch) =>
       val fitDeps = branch.fitDeps
       fitDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset))
     }.reduceLeft(_ ++ _) ++
       branchesWithNodeOffsets.map { case (offset, branch) =>
         val fitDeps = branch.fitDeps
-        fitDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset + extraBranchOffset))
-      }.reduceLeft(_ ++ _) :+ None :+ None :+ None :+ Some(newNodes.size - 4)
+        fitDeps.map(_.map(x => if (x == Pipeline.SOURCE) Pipeline.SOURCE else x + offset + numNodesInBranches))
+      }.reduceLeft(_ ++ _) :+
+      None :+
+      None :+
+      None :+
+      Some(modelSelectorIndex)
 
-    val newSink = newNodes.size - 1
+    // The output of the delegating transformer becomes the new sink
+    val newSink = delegatingTransformerIndex
     Pipeline(newNodes, newDataDeps, newFitDeps, newSink)
   }
 }
