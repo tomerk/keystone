@@ -6,13 +6,13 @@ import pipelines.Logging
 import scala.reflect.ClassTag
 
 /**
- * An EstimatorNode that tunes between several branches using training data and labels and an evaluator.
+ * An EstimatorNode that tunes between several branches using validation data and labels and an evaluator.
  * Outputs a [[SelectedModel]] that chooses for test time whichever branch had the highest evaluation on
- * the train data.
+ * the validation data.
  *
- * @param evaluator The validation metric to use to evaluate the data and labels
- * @tparam T The type of the training data
- * @tparam L The type of the training labels
+ * @param evaluator The metric to use to evaluate the data and labels
+ * @tparam T The type of the validation data
+ * @tparam L The type of the validation labels
  */
 case class ModelSelector[T : ClassTag, L](evaluator: (RDD[T], RDD[L]) => Double) extends EstimatorNode with Logging {
   override private[workflow] def fitRDDs(dependencies: Iterator[RDD[_]]): TransformerNode = {

@@ -194,7 +194,20 @@ object Pipeline {
   }
 
   /**
-   * TODO: DOCUMENT!
+   * A method used for tuning between several pipeline options on validation data.
+   *
+   * It takes multiple pipelines, validation data and labels, and an evaluation metric,
+   * and returns a newpipeline that evaluates all of the inputs on the validation data, then applies
+   * the best-scoring pipeline to test data.
+   *
+   * @param branches The sequence of pipelines to tune between.
+   * @param data The validation data to pass into each branch
+   * @param labels The labels for the validation data
+   * @param evaluator The evaluation metric to use on the validation data
+   * @tparam A The input type of the pipelines
+   * @tparam B The output type of the pipelines
+   * @tparam L The type of the validation labels
+   * @return
    */
   def tune[A, B : ClassTag, L](
       branches: Seq[Pipeline[A, B]],
