@@ -73,8 +73,8 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     val filterBatchSize = conf.numFilters / numBatches
     logInfo(s"numBatches:$numBatches,filterBatchSize:$filterBatchSize")
 
-    val featurizers = (0 until numBatches).map(i => {
-      val filterStart = i*batchSize
+    val featurizers = (0 until numBatches).toStream.map(i => {
+      val filterStart = i*filterBatchSize
       val filterStop = filterStart+filterBatchSize
 
       new Convolver(filters(filterStart until filterStop, ::), augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
@@ -116,7 +116,7 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     val numFeatures = conf.numFilters * 2 * 4 // 4 pools, 2 for symm rectifier
 
     val model = new BlockLeastSquaresEstimator(batchSize, 1,
-      conf.lambda.getOrElse(0.0), useIntercept=false).fit(trainFeatures, trainLabelsVect)
+      conf.lambda.getOrElse(0.0), useIntercept=false, numBlocks = Some(numBatches)).fit(trainFeatures, trainLabelsVect)
 
     // Lets do two tests here 
     model.applyAndEvaluate(testFeaturesAugmented,

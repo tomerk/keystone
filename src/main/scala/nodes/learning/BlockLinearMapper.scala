@@ -199,7 +199,7 @@ object BlockLeastSquaresEstimator {
  * @param numIter number of iterations of solver to run
  * @param lambda L2-regularization to use
  */
-class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 0.0, useIntercept: Boolean = true)
+class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 0.0, useIntercept: Boolean = true, numBlocks: Option[Int] = None)
   extends LabelEstimator[DenseVector[Double], DenseVector[Double], DenseVector[Double]] {
 
   /**
@@ -220,7 +220,10 @@ class BlockLeastSquaresEstimator(blockSize: Int, numIter: Int, lambda: Double = 
       }
       (fSVal, Some(lSVal))
     } else {
-      (Seq.fill(trainingFeatures.size)(None), None)
+      numBlocks match {
+        case Some(x) => (Seq.fill(x)(None), None)
+        case None => (Seq.fill(trainingFeatures.size)(None), None)
+      }
     }
 
     val numClasses = trainingLabels.first.length
