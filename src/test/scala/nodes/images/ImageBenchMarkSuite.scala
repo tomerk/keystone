@@ -12,9 +12,9 @@ import scala.util.Random
 class ImageBenchMarkSuite extends FunSuite with Logging {
 
   // TODO(shivaram): Uncomment this after we figure out its resource usage (4G for sbt ?)
-  // case class TestParam(name: String, size: (Int, Int, Int), kernelSize: Int, numKernels: Int, poolSize: Int, poolStride: Int)
-  // val tests = Array(
-  //   TestParam("Cifar100", (32,32,3), 6, 100, 13, 14),
+  case class TestParam(name: String, size: (Int, Int, Int), kernelSize: Int, numKernels: Int, poolSize: Int, poolStride: Int)
+  val tests = Array(
+    TestParam("Cifar512", (32,32,3), 6, 512, 13, 14))
   //   TestParam("Cifar1000", (32,32,3), 6, 1000, 13, 14),
   //   TestParam("Cifar10000", (32,32,3), 6, 10000, 13, 14),
   //   TestParam("ImageNet", (256,256,3), 6, 100, (256-5)/2, (256-5)/2),
@@ -102,43 +102,43 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
   // 
   // }
   // 
-  // test("Convolution Benchmarks") {
-  //   def convTime(x: Image, t: TestParam) = {
-  //     val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
-  //     val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, normalizePatches = false)
-  // 
-  //     val start = System.nanoTime
-  //     val res = conv(x)
-  //     val elapsed = System.nanoTime - start
-  // 
-  //     elapsed
-  //   }
-  // 
-  //   val res = for(
-  //     iter <- 1 to 10;
-  //     t <- tests
-  //   ) yield {
-  //     val img = genChannelMajorArrayVectorizedImage(t.size._1, t.size._2, t.size._3) //Standard grayScale format.
-  // 
-  //     val flops = (t.size._1.toLong-t.kernelSize+1)*(t.size._2-t.kernelSize+1)*
-  //       t.size._3*t.kernelSize*t.kernelSize*
-  //       t.numKernels
-  // 
-  //     val t1 = convTime(img, t)
-  // 
-  //     logDebug(s"${t.name},$t1,$flops,${2.0*flops.toDouble/t1}")
-  //     (t.name, t1, flops, (2.0*flops.toDouble/t1))
-  //   }
-  //   val groups = res.groupBy(_._1)
-  // 
-  // 
-  //   logInfo(Seq("name","max(flops)","median(flops)","stddev(flops)").mkString(","))
-  //   groups.foreach { case (name, values) =>
-  //     val flops = DenseVector(values.map(_._4):_*)
-  //     val maxf = max(flops)
-  //     val medf = median(flops)
-  //     val stddevf = stddev(flops)
-  //     logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f")
-  //   }
-  // }
+   test("Convolution Benchmarks") {
+     def convTime(x: Image, t: TestParam) = {
+       val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
+       val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, normalizePatches = false)
+
+       val start = System.nanoTime
+       val res = conv(x)
+       val elapsed = System.nanoTime - start
+
+       elapsed
+     }
+
+     val res = for(
+       iter <- 1 to 100;
+       t <- tests
+     ) yield {
+       val img = genChannelMajorArrayVectorizedImage(t.size._1, t.size._2, t.size._3) //Standard grayScale format.
+
+       val flops = (t.size._1.toLong-t.kernelSize+1)*(t.size._2-t.kernelSize+1)*
+         t.size._3*t.kernelSize*t.kernelSize*
+         t.numKernels
+
+       val t1 = convTime(img, t)
+
+       logDebug(s"${t.name},$t1,$flops,${2.0*flops.toDouble/t1}")
+       (t.name, t1, flops, (2.0*flops.toDouble/t1))
+     }
+     val groups = res.groupBy(_._1)
+
+
+     logInfo(Seq("name","max(flops)","median(flops)","stddev(flops)").mkString(","))
+     groups.foreach { case (name, values) =>
+       val flops = DenseVector(values.map(_._4):_*)
+       val maxf = max(flops)
+       val medf = median(flops)
+       val stddevf = stddev(flops)
+       logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f")
+     }
+   }
 }
