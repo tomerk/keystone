@@ -34,7 +34,7 @@ class Pooler(
 
     val numPoolsX = math.ceil((xDim - strideStart).toDouble / stride).toInt
     val numPoolsY = math.ceil((yDim - strideStart).toDouble / stride).toInt
-    val patch = new Array[Double]( numPoolsX * numPoolsY * numChannels)
+    val patch = new Array[Double](numPoolsX * numPoolsY * numChannels)
 
     // Start at strideStart in (x, y) and
     for (x <- strideStart until xDim by stride;
@@ -42,28 +42,29 @@ class Pooler(
       // Extract the pool. Then apply the pixel and pool functions
 
       val pool = DenseVector.zeros[Double](poolSize * poolSize)
-      val startX = x - poolSize/2
-      val endX = math.min(x + poolSize/2, xDim)
-      val startY = y - poolSize/2
-      val endY = math.min(y + poolSize/2, yDim)
+      val startX = x - poolSize / 2
+      val endX = math.min(x + poolSize / 2, xDim)
+      val startY = y - poolSize / 2
+      val endY = math.min(y + poolSize / 2, yDim)
 
       var c = 0
       while (c < numChannels) {
-        var s = startX
-        while (s < endX) {
-          var b = startY
-          while (b < endY) {
-            pool((s-startX) + (b-startY)*(endX-startX)) =
+        var b = startY
+        while (b < endY) {
+          var s = startX
+          while (s < endX) {
+            pool((s - startX) + (b - startY) * (endX - startX)) =
               pixelFunction(image.get(s, b, c))
-            b = b + 1
+            s = s + 1
           }
-          s = s + 1
+          b = b + 1
         }
-        patch(c + (x - strideStart)/stride * numChannels +
-          (y - strideStart)/stride * numPoolsX * numChannels) = poolFunction(pool)
+        patch(c + (x - strideStart) / stride * numChannels +
+          (y - strideStart) / stride * numPoolsX * numChannels) = poolFunction(pool)
         c = c + 1
       }
     }
+
     ChannelMajorArrayVectorizedImage(patch, ImageMetadata(numPoolsX, numPoolsY, numChannels))
   }
 }

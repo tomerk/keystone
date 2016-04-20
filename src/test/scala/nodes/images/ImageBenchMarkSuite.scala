@@ -4,6 +4,7 @@ import breeze.linalg._
 import breeze.stats._
 import org.scalatest.FunSuite
 import pipelines.Logging
+import pipelines.images.cifar.RandomPatchCifarRawAugmentLazy.RandomCifarFeaturizerConfig
 import utils._
 import utils.TestUtils._
 
@@ -14,7 +15,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
   // TODO(shivaram): Uncomment this after we figure out its resource usage (4G for sbt ?)
   case class TestParam(name: String, size: (Int, Int, Int), kernelSize: Int, numKernels: Int, poolSize: Int, poolStride: Int)
   val tests = Array(
-    TestParam("Cifar512", (32,32,3), 6, 512, 13, 14))
+    TestParam("AugmentedCifar512", (24,24,3), 6, 512, 13, 14))
   //   TestParam("Cifar1000", (32,32,3), 6, 1000, 13, 14),
   //   TestParam("Cifar10000", (32,32,3), 6, 10000, 13, 14),
   //   TestParam("ImageNet", (256,256,3), 6, 100, (256-5)/2, (256-5)/2),
@@ -135,10 +136,58 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
      logInfo(Seq("name","max(flops)","median(flops)","stddev(flops)").mkString(","))
      groups.foreach { case (name, values) =>
        val flops = DenseVector(values.map(_._4):_*)
+       val times = DenseVector(values.map(_._2.toDouble):_*)
        val maxf = max(flops)
        val medf = median(flops)
        val stddevf = stddev(flops)
-       logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f")
+       val medt = median(times)
+       logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f,$medt")
      }
    }
+
+  test("Pooler benchmark") {
+    def poolTime(x: RowMajorArrayVectorizedImage, pooler: FastPooler) = {
+
+      val start = System.nanoTime
+      val res = pooler(x)
+      val elapsed = System.nanoTime - start
+
+      (elapsed, res)
+    }
+    //Thread.sleep(10000)
+
+    val res = for(
+      iter <- 1 to 100;
+      t <- tests
+    ) yield {
+      val convOutputSizeX = t.size._1 - t.kernelSize + 1
+      val convOutputSizeY = t.size._2 - t.kernelSize + 1
+
+      val img = genRowMajorArrayVectorizedImage(convOutputSizeX, convOutputSizeY, t.numKernels)
+      val conf = RandomCifarFeaturizerConfig()
+
+      val gbs = (convOutputSizeX*convOutputSizeY*t.numKernels*8.0)// + (2*2*t.numKernels*8.0)
+
+      val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, img.metadata)
+      //val pooler = new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector)
+      val (t1, res) = poolTime(img, pooler)
+      logInfo(s"$t1, $gbs, ${res.get(1,1,1)}, ${gbs.toDouble/t1}")
+
+      (t.name, t1, gbs, gbs.toDouble/t1)
+    }
+
+    val groups = res.groupBy(_._1)
+
+    logInfo(Seq("name","max(gbs)","median(gbs)","stddev(gbs)").mkString(","))
+    groups.foreach { case (name, values) =>
+      val gBytesPerSec = DenseVector(values.map(_._4):_*)
+      val times = DenseVector(values.map(_._2.toDouble):_*)
+      val maxgbs = max(gBytesPerSec)
+      val medgbs = median(gBytesPerSec)
+      val stddevgbs = stddev(gBytesPerSec)
+      val medtimes = median(times)
+
+      logInfo(f"$name,$maxgbs%2.3f,$medgbs%2.3f,$stddevgbs%2.3f,$medtimes")
+    }
+  }
 }
