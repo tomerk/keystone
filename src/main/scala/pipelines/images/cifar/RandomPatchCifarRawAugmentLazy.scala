@@ -75,20 +75,31 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     val filterMetadata = filters
 
     val featurizers = (0 until numBatches).toStream.map(i => {
-      val filterStart = i*filterBatchSize
-      val filterStop = filterStart+filterBatchSize
+      val filterStart = i * filterBatchSize
+      val filterStop = filterStart + filterBatchSize
       val convolvedMetadata = ImageMetadata(
-        augmentRandomPatchSize-conf.patchSize+1,
-        augmentRandomPatchSize-conf.patchSize+1,
+        augmentRandomPatchSize - conf.patchSize + 1,
+        augmentRandomPatchSize - conf.patchSize + 1,
         filterBatchSize)
 
-      new Convolver(filters(filterStart until filterStop, ::), augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
+      val firstPart = new Convolver(filters(filterStart until filterStop, ::), augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
         .andThen(new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, convolvedMetadata))
         .andThen(ImageVectorizer)
         .andThen(new Cacher[DenseVector[Double]](Some(s"features$i")))
-        .andThen(new StandardScaler(), trainImagesAugmented)
-        .andThen(Transformer(x => DenseVector(MatrixUtils.shuffleArray(x.toArray))))
-        .andThen(new Cacher[DenseVector[Double]](Some(s"scaled_features$i")))
+
+      def secondPart(x: RDD[DenseVector[Double]]) = {
+        new StandardScaler().withData(x)
+          .andThen(Transformer(x => DenseVector(MatrixUtils.shuffleArray(x.toArray))))
+          .andThen(new Cacher[DenseVector[Double]](Some(s"scaled_features$i")))
+
+      }
+
+      def pipe(x: RDD[Image]): RDD[DenseVector[Double]] = {
+        val res = firstPart(x)
+        secondPart(res)(res)
+      }
+
+      pipe _
     })
 
     def featurizer(x: RDD[Image]): Seq[RDD[DenseVector[Double]]] = featurizers.map(f => f(x))
