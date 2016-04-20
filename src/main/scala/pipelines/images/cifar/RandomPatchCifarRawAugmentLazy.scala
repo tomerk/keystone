@@ -18,7 +18,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import pipelines.Logging
 import scopt.OptionParser
-import utils.{MatrixUtils, Stats, Image, ImageUtils}
+import utils._
 
 object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
   val appName = "RandomPatchCifarRawAugmentLazy"
@@ -72,14 +72,18 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     val numBatches = conf.numFilters * 2 * 4 / batchSize
     val filterBatchSize = conf.numFilters / numBatches
     logInfo(s"numBatches:$numBatches,filterBatchSize:$filterBatchSize")
+    val filterMetadata = filters
 
     val featurizers = (0 until numBatches).toStream.map(i => {
       val filterStart = i*filterBatchSize
       val filterStop = filterStart+filterBatchSize
+      val convolvedMetadata = ImageMetadata(
+        augmentRandomPatchSize-conf.patchSize+1,
+        augmentRandomPatchSize-conf.patchSize+1,
+        filterBatchSize)
 
       new Convolver(filters(filterStart until filterStop, ::), augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
-        .andThen(SymmetricRectifier(alpha=conf.alpha))
-        .andThen(new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector))
+        .andThen(new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, convolvedMetadata))
         .andThen(ImageVectorizer)
         .andThen(new Cacher[DenseVector[Double]](Some(s"features$i")))
         .andThen(new StandardScaler(), trainImagesAugmented)
