@@ -170,7 +170,7 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
   def main(args: Array[String]) = {
     val appConfig = parse(args)
 
-    val conf = new SparkConf().setAppName(appName).set("spark.mlmatrix.treeBranchingFactor","8")
+    val conf = new SparkConf().setAppName(appName).set("spark.mlmatrix.treeBranchingFactor","8").set("spark.driver.maxResultSize", "0")
     conf.setIfMissing("spark.master", "local[8]")
     // NOTE: ONLY APPLICABLE IF YOU CAN DONE COPY-DIR
     conf.remove("spark.jars")
