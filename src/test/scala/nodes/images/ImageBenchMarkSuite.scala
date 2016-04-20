@@ -2,20 +2,21 @@ package nodes.images
 
 import breeze.linalg._
 import breeze.stats._
+import org.apache.spark.SparkContext
 import org.scalatest.FunSuite
-import pipelines.Logging
+import pipelines.{LocalSparkContext, Logging}
 import pipelines.images.cifar.RandomPatchCifarRawAugmentLazy.RandomCifarFeaturizerConfig
 import utils._
 import utils.TestUtils._
 
 import scala.util.Random
 
-class ImageBenchMarkSuite extends FunSuite with Logging {
+class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
 
   // TODO(shivaram): Uncomment this after we figure out its resource usage (4G for sbt ?)
-  case class TestParam(name: String, size: (Int, Int, Int), kernelSize: Int, numKernels: Int, poolSize: Int, poolStride: Int)
+
   val tests = Array(
-    TestParam("AugmentedCifar512", (24,24,3), 6, 512, 13, 14))
+    IbUtils.TestParam("AugmentedCifar512", (24,24,3), 6, 512, 13, 14))
   //   TestParam("Cifar1000", (32,32,3), 6, 1000, 13, 14),
   //   TestParam("Cifar10000", (32,32,3), 6, 10000, 13, 14),
   //   TestParam("ImageNet", (256,256,3), 6, 100, (256-5)/2, (256-5)/2),
@@ -104,7 +105,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
   // }
   // 
    test("Convolution Benchmarks") {
-     def convTime(x: Image, t: TestParam) = {
+     def convTime(x: Image, t: IbUtils.TestParam) = {
        val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
        val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, normalizePatches = false)
 
@@ -171,7 +172,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
       val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, img.metadata)
       //val pooler = new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector)
       val (t1, res) = poolTime(img, pooler)
-      logInfo(s"$t1, $gbs, ${res.get(1,1,1)}, ${gbs.toDouble/t1}")
+      //logInfo(s"$t1, $gbs, ${res.get(1,1,1)}, ${gbs.toDouble/t1}")
 
       (t.name, t1, gbs, gbs.toDouble/t1)
     }
@@ -190,4 +191,63 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
       logInfo(f"$name,$maxgbs%2.3f,$medgbs%2.3f,$stddevgbs%2.3f,$medtimes")
     }
   }
+
+  test("spark benchmark") {
+    def logStats(s: DenseVector[Double], name: String) = {
+      val meant = mean(s)
+      val medt = median(s)
+      val sdt = stddev(s)
+
+      logInfo(f"$name Avg:$meant%2.3f, Med: $medt%2.3f, Stdev: $sdt%2.3f")
+    }
+
+    sc = new SparkContext("local[8]", "test")
+
+    val parts = sc.parallelize(0 until 8)
+    val t = tests(0)
+
+    val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
+    val conv = new Convolver(filters, t.size._1, t.size._2, t.size._3, normalizePatches = false)
+
+
+    val imgRdd = parts.flatMap(x => {
+      (0 until 10).map(i => genRowMajorArrayVectorizedImage(t.size._1, t.size._2, t.kernelSize))
+    })
+
+    val convolvedImageRdd = imgRdd.map(i => IbUtils.timeIt(conv.apply: Image => Image, i)).cache()
+    val convTimes = convolvedImageRdd.collect().map(_._1.toDouble)
+
+
+    val convTimeVec = DenseVector(convTimes:_*)
+    logStats(convTimeVec, "conv")
+
+
+    val img = convolvedImageRdd.first._2
+
+    val conf = RandomCifarFeaturizerConfig()
+
+    val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, img.metadata)
+    val pooledImageRdd = convolvedImageRdd.map(i => IbUtils.timeIt(pooler.apply, i._2)).cache()
+
+    val poolTimes = pooledImageRdd.collect().map(_._1.toDouble)
+
+    val poolTimeVec = DenseVector(poolTimes:_*)
+
+    logStats(poolTimeVec, "pool")
+
+  }
+}
+
+
+object IbUtils extends Serializable {
+  def timeIt[I,O](f: I => O, in: I): (Double, O) = {
+    val start = System.nanoTime
+    val out = f(in)
+    val t = System.nanoTime - start
+    (t, out)
+  }
+
+  case class TestParam(name: String, size: (Int, Int, Int), kernelSize: Int, numKernels: Int, poolSize: Int, poolStride: Int)
+
+
 }

@@ -24,7 +24,7 @@ class FastPooler(
               maxVal: Double,
               alpha: Double,
               imageMeta: ImageMetadata)
-  extends Transformer[RowMajorArrayVectorizedImage, Image] {
+  extends Transformer[Image, Image] {
 
   val strideStart = poolSize / 2
 
@@ -46,7 +46,7 @@ class FastPooler(
   val outmeta = ImageMetadata(numPoolsX, numPoolsY, numChannels*2)
 
 
-  def apply(image: RowMajorArrayVectorizedImage): RowMajorArrayVectorizedImage = {
+  def apply(image: Image): Image = {
     val outputImage = RowMajorArrayVectorizedImage(Array.fill(numPoolsX*numPoolsY*numChannels*2)(0.0), outmeta)
 
     var x, y, c, xp, yp = 0
