@@ -192,9 +192,13 @@ object Convolver {
       poy+=1
     }
 
-    val patchMatN = if(normalizePatches) Stats.normalizeRows(patchMat, varConstant) else patchMat
+    val whitemeans = whitener match {
+      case Some(whiteness) => Some(whiteness.means)
+      case None => None
+    }
+    val patchMatN = if(normalizePatches) Stats.normalizeRows(patchMat, varConstant, whitemeans) else patchMat
 
-    val res = patchMatN
+    /*val res = patchMatN
 
     whitener match {
       case None => patchMatN
@@ -203,15 +207,15 @@ object Convolver {
         while(c < patchMatN.cols) {
           r=0
           while(r < patchMatN.rows) {
-            patchMatN(r,c) /= whiteness.means(c)
+            patchMatN(r,c) -= whiteness.means(c)
             r+=1
           }
           c+=1
         }
         //patchMatN(*, ::) - whiteness.means
-    }
+    }*/
 
-    res
+    patchMatN
   }
 
   def convolvePartitions(
