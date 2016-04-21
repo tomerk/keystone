@@ -194,9 +194,21 @@ object Convolver {
 
     val patchMatN = if(normalizePatches) Stats.normalizeRows(patchMat, varConstant) else patchMat
 
-    val res = whitener match {
+    val res = patchMatN
+
+    whitener match {
       case None => patchMatN
-      case Some(whiteness) => patchMatN(*, ::) - whiteness.means
+      case Some(whiteness) =>
+        var r, c = 0
+        while(c < patchMatN.cols) {
+          r=0
+          while(r < patchMatN.rows) {
+            patchMatN(r,c) /= whiteness.means(c)
+            r+=1
+          }
+          c+=1
+        }
+        //patchMatN(*, ::) - whiteness.means
     }
 
     res

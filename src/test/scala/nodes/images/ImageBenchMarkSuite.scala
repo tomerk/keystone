@@ -2,6 +2,7 @@ package nodes.images
 
 import breeze.linalg._
 import breeze.stats._
+import nodes.learning.ZCAWhitener
 import org.apache.spark.SparkContext
 import org.scalatest.FunSuite
 import pipelines.{LocalSparkContext, Logging}
@@ -106,8 +107,10 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
   // 
    test("Convolution Benchmarks") {
      def convTime(x: Image, t: IbUtils.TestParam) = {
+       val whiteSize = t.kernelSize*t.kernelSize*t.size._3
+       val whitener = new ZCAWhitener(DenseMatrix.rand[Double](whiteSize, whiteSize), DenseVector.rand[Double](whiteSize))
        val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
-       val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, normalizePatches = true)
+       val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, whitener = Some(whitener), normalizePatches = true)
 
        val start = System.nanoTime
        val res = conv(x)
