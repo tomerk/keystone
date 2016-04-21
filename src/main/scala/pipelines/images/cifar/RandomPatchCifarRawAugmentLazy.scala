@@ -102,6 +102,8 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
       pipe _
     })
 
+    logInfo("TIMING - Starting features")
+
     def featurizer(x: RDD[Image]): Seq[RDD[DenseVector[Double]]] = featurizers.map(f => f(x))
 
     val labelExtractorVectorizer = LabelExtractor andThen ClassLabelIndicatorsFromIntLabels(numClasses)
@@ -110,6 +112,13 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     val trainLabelsVect = new LabelAugmenter(numRandomPatchesAugment).apply(labelExtractorVectorizer(trainData)).cache()
 
     val trainFeatures = featurizer(trainImagesAugmented)
+
+    val numFeatures = conf.numFilters * 2 * 4 // 4 pools, 2 for symm rectifier
+
+    val model = new BlockLeastSquaresEstimator(batchSize, 1,
+      conf.lambda.getOrElse(0.0), useIntercept=false, numBlocks = Some(numBatches)).fit(trainFeatures, trainLabelsVect)
+
+    logInfo("TIMING - Model Trained")
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
@@ -128,10 +137,7 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     val testImageIdsCenterOnly = new LabelAugmenter(1).apply(testImageIds)
     val testFeaturesCenterOnly = featurizer(testImagesCenterOnly)
 
-    val numFeatures = conf.numFilters * 2 * 4 // 4 pools, 2 for symm rectifier
 
-    val model = new BlockLeastSquaresEstimator(batchSize, 1,
-      conf.lambda.getOrElse(0.0), useIntercept=false, numBlocks = Some(numBatches)).fit(trainFeatures, trainLabelsVect)
 
     // Lets do two tests here 
     model.applyAndEvaluate(testFeaturesAugmented,
