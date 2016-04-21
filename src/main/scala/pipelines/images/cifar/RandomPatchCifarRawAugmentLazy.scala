@@ -74,6 +74,10 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     logInfo(s"numBatches:$numBatches,filterBatchSize:$filterBatchSize")
     val filterMetadata = filters
 
+    // map from batch id to rdd that was cached
+    val cacheMap = new java.util.HashMap[Int, RDD[DenseVector[Double]]]
+    var curBatch = 0
+
     val featurizers = (0 until numBatches).toStream.map(i => {
       val filterStart = i * filterBatchSize
       val filterStop = filterStart + filterBatchSize
@@ -85,17 +89,28 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
       val firstPart = new Convolver(filters(filterStart until filterStop, ::), augmentRandomPatchSize, augmentRandomPatchSize, numChannels, Some(whitener), true)
         .andThen(new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, convolvedMetadata))
         .andThen(ImageVectorizer)
-        .andThen(new Cacher[DenseVector[Double]](Some(s"features$i")))
+        //.andThen(new Cacher[DenseVector[Double]](Some(s"features$i")))
 
       def secondPart(x: RDD[DenseVector[Double]]) = {
         new StandardScaler().withData(x)
-          .andThen(Transformer(x => DenseVector(MatrixUtils.shuffleArray(x.toArray))))
-          .andThen(new Cacher[DenseVector[Double]](Some(s"scaled_features$i")))
-
+          //.andThen(Transformer(x => DenseVector(MatrixUtils.shuffleArray(x.toArray))))
+          //.andThen(new Cacher[DenseVector[Double]](Some(s"scaled_features$i")))
       }
 
       def pipe(x: RDD[Image]): RDD[DenseVector[Double]] = {
         val res = firstPart(x)
+        // Save a handle to this RDD in our cacheMap
+        res.cache()
+        logInfo(s"Caching RDD ${res.id} of iter ${curBatch}")
+        cacheMap.put(curBatch, res)
+
+        if (curBatch > 0 && cacheMap.containsKey(curBatch - 1))  {
+          val oldRDD = cacheMap.get(curBatch - 1)
+          logInfo(s"Un-caching RDD ${oldRDD.id} of iter ${curBatch-1}")
+          cacheMap.get(curBatch - 1).unpersist()
+        }
+
+        curBatch = curBatch + 1
         secondPart(res)(res)
       }
 
@@ -104,7 +119,7 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
 
     logInfo("TIMING - Starting features")
 
-    def featurizer(x: RDD[Image]): Seq[RDD[DenseVector[Double]]] = featurizers.map(f => f(x))
+    def featurizer(x: RDD[Image]): Seq[RDD[DenseVector[Double]]] = featurizers.map { f => f(x) }
 
     val labelExtractorVectorizer = LabelExtractor andThen ClassLabelIndicatorsFromIntLabels(numClasses)
 
