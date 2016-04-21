@@ -107,7 +107,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
    test("Convolution Benchmarks") {
      def convTime(x: Image, t: IbUtils.TestParam) = {
        val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
-       val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, normalizePatches = false)
+       val conv = new Convolver(filters, x.metadata.xDim, x.metadata.yDim, x.metadata.numChannels, normalizePatches = true)
 
        val start = System.nanoTime
        val res = conv(x)
@@ -207,7 +207,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
     val t = tests(0)
 
     val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
-    val conv = new Convolver(filters, t.size._1, t.size._2, t.size._3, normalizePatches = false)
+    val conv = new Convolver(filters, t.size._1, t.size._2, t.size._3, normalizePatches = true)
 
 
     val imgRdd = parts.flatMap(x => {

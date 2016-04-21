@@ -112,12 +112,48 @@ object Stats extends Serializable {
   def normalizeRows(mat: DenseMatrix[Double], alpha: Double = 1.0): DenseMatrix[Double] = {
     // FIXME: This currently must convert the matrices to double due to breeze implicits
     // TODO: Could optimize, use way fewer copies
-    val rowMeans: DenseVector[Double] = mean(mat(*, ::)).map(x => if (x.isNaN) 0 else x)
-    val variances: DenseVector[Double] = sum((mat(::, *) - rowMeans) :^= 2.0, Axis._1) :/= (mat.cols.toDouble - 1.0)
-    val sds: DenseVector[Double] = sqrt(variances + alpha.toDouble).map(x => if (x.isNaN) math.sqrt(alpha) else x)
+    //val rowMeans: DenseVector[Double] = mean(mat(*, ::)).map(x => if (x.isNaN) 0 else x)
+    //val variances: DenseVector[Double] = sum((mat(::, *) - rowMeans) :^= 2.0, Axis._1) :/= (mat.cols.toDouble - 1.0)
+    //val sds: DenseVector[Double] = sqrt(variances + alpha.toDouble).map(x => if (x.isNaN) math.sqrt(alpha) else x)
 
-    val out = mat(::, *) - rowMeans
-    out(::, *) /= sds
+
+    val counts = mat.cols.toDouble
+    val sums = DenseVector.zeros[Double](mat.rows)
+    val sumssq = DenseVector.zeros[Double](mat.rows)
+    val out = DenseMatrix.zeros[Double](mat.rows, mat.cols)
+    //val means = DenseVector.zeros[Double](mat.rows)
+    //val sds = DenseVector.zeros[Double](mat.rows)
+
+    var r,c = 0
+    while(c < mat.cols) {
+      r=0
+      while(r < mat.rows) {
+        sums(r)+=mat(r,c)
+        sumssq(r)+=mat(r,c)*mat(r,c)
+        r+=1
+      }
+      c+=1
+    }
+
+    r = 0
+    while(r < mat.rows) {
+      sumssq(r) = math.sqrt(alpha + (sumssq(r) - sums(r)*sums(r)/counts)/(counts-1))
+      sums(r) = sums(r)/counts
+      r+=1
+    }
+
+    c = 0
+    while(c < mat.cols) {
+      r=0
+      while(r < mat.rows) {
+        out(r,c) = (mat(r,c)-sums(r))/sumssq(r)
+        r+=1
+      }
+      c+=1
+    }
+
+    //val out = mat(::, *) - rowMeans
+    //out(::, *) /= sds
 
     out
   }
