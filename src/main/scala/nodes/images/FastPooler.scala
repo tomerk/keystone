@@ -35,14 +35,11 @@ class FastPooler(
   val yPoolStarts = (strideStart until imageMeta.yDim by poolStride)
   val yPoolRanges = yPoolStarts.map(y => (y-poolSize/2, math.min(y + poolSize / 2, imageMeta.yDim))).zipWithIndex
 
-  def determineOutputBuckets(coord: Int, ranges: Seq[((Int,Int), Int)]): Seq[Int] = {
-    ranges.filter{ case ((b,e),i) => coord >= b && coord < e}.map(_._2)
+  def determineOutputBuckets(coord: Int, ranges: Seq[((Int,Int), Int)]): Array[Int] = {
+    ranges.filter{ case ((b,e),i) => coord >= b && coord < e}.map(_._2).toArray
   }
   val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray.map(_.head)
   val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray.map(_.head)
-  println(xPools.mkString(","))
-  println(yPools.mkString(","))
-
 
   val xDim = imageMeta.xDim
   val yDim = imageMeta.yDim
