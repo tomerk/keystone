@@ -63,4 +63,24 @@ class PoolingSuite extends FunSuite with Logging {
       val poolImage = pooling(image)
     }
   }
+
+  test("SymmetricRectifier/Pooler and FastPooler should be the same") {
+    val (x, y, c) = (24-6+1, 24-6+1, 10)
+
+    val baseImage = utils.TestUtils.genRowMajorArrayVectorizedImage(x,y,c)
+
+    val pipe = SymmetricRectifier(alpha=0.25) andThen new Pooler(9, 10, identity, Pooler.sumVector)
+
+    val goodOutput = pipe(baseImage)
+
+    val badOutput = new FastPooler(9, 10, 0.0, 0.25, ImageMetadata(x,y,c)).apply(baseImage)
+
+    for(x <- 0 until goodOutput.metadata.xDim;
+        y <- 0 until goodOutput.metadata.yDim;
+        c <- 0 until goodOutput.metadata.numChannels) {
+      assert(goodOutput.get(x,y,c) == badOutput.get(x,y,c),
+        s"Mismatch at ($x,$y,$c): good: ${goodOutput.get(x,y,c)}, bad: ${badOutput.get(x,y,c)}")
+    }
+
+  }
 }

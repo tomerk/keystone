@@ -160,6 +160,8 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
     }
     //Thread.sleep(10000)
 
+    val conf = RandomCifarFeaturizerConfig()
+    val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, ImageMetadata(24-6+1, 24-6+1, 512))
     val res = for(
       iter <- 1 to 100;
       t <- tests
@@ -168,11 +170,11 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
       val convOutputSizeY = t.size._2 - t.kernelSize + 1
 
       val img = genRowMajorArrayVectorizedImage(convOutputSizeX, convOutputSizeY, t.numKernels)
-      val conf = RandomCifarFeaturizerConfig()
+
 
       val gbs = (convOutputSizeX*convOutputSizeY*t.numKernels*8.0)// + (2*2*t.numKernels*8.0)
 
-      val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, img.metadata)
+
       //val pooler = new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector)
       val (t1, res) = poolTime(img, pooler)
       //logInfo(s"$t1, $gbs, ${res.get(1,1,1)}, ${gbs.toDouble/t1}")
