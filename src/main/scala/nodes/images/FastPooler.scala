@@ -61,7 +61,6 @@ class FastPooler(
       y = 0
       while (y < yDim) {
         x = 0
-        yPool = yPools(y)
         while(x < xDim) {
 
           //Do symmetric rectification
