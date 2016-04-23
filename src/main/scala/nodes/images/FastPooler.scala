@@ -38,8 +38,8 @@ class FastPooler(
   def determineOutputBuckets(coord: Int, ranges: Seq[((Int,Int), Int)]): Array[Int] = {
     ranges.filter{ case ((b,e),i) => coord >= b && coord < e}.map(_._2).toArray
   }
-  val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray.map(_.head)
-  val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray.map(_.head)
+  val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray//.map(_.head)
+  val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray//.map(_.head)
 
   val xDim = imageMeta.xDim
   val yDim = imageMeta.yDim
@@ -68,26 +68,26 @@ class FastPooler(
           val upval = math.max(maxVal, pix-alpha)
           val downval = math.max(maxVal, -pix - alpha)
 
-//          //Put the pixel in all appropriate pools
-//          yp = 0
-//          while (yp < yPools(y).length) {
-//            yPool = yPools(y)(yp)
-//
-//            xp = 0
-//            while (xp < xPools(x).length) {
-//              xPool = xPools(x)(xp)
-//              outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
-//              outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
-//              i+=1
-//
-//              xp+=1
-//            }
-//            yp+=1
-//          }
-          xPool = xPools(x)
+          //Put the pixel in all appropriate pools
+          yp = 0
+          while (yp < yPools(y).length) {
+            yPool = yPools(y)(yp)
 
-          outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
-          outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
+            xp = 0
+            while (xp < xPools(x).length) {
+              xPool = xPools(x)(xp)
+              outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
+              outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
+              i+=1
+
+              xp+=1
+            }
+            yp+=1
+          }
+//          xPool = xPools(x)
+//
+//          outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
+//          outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
 
           x+=1
         }
