@@ -189,6 +189,7 @@ object RandomPatchCifarRawAugmentLazy extends Serializable with Logging {
     opt[Int]("patchSize") action { (x,c) => c.copy(patchSize=x) }
     opt[Int]("patchSteps") action { (x,c) => c.copy(patchSteps=x) }
     opt[Int]("poolSize") action { (x,c) => c.copy(poolSize=x) }
+    opt[Int]("poolStride") action { (x,c) => c.copy(poolStride=x) }
     opt[Int]("numRandomPatchesAugment") action { (x,c) => c.copy(numRandomPatchesAugment=x) }
     opt[Double]("alpha") action { (x,c) => c.copy(alpha=x) }
     opt[Double]("lambda") action { (x,c) => c.copy(lambda=Some(x)) }
