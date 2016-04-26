@@ -14,8 +14,8 @@ do
     --trainLocation /mnt/cifar_train.bin \
     --testLocation /mnt/cifar_test.bin \
     --numFilters $FILTERS \
-    --lambda $LAMBDA\
-    --poolSize 10 \ 
+    --lambda $LAMBDA \
+    --poolSize 10 \
     --poolStride 10 \
     --patchSize 5 > $LOG_DIR/$LOG_FILE
     
@@ -26,8 +26,8 @@ do
     --trainLocation /mnt/cifar_train.bin \
     --testLocation /mnt/cifar_test.bin \
     --numFilters $FILTERS \
-    --lambda $LAMBDA\
-    --poolSize 9 \ 
+    --lambda $LAMBDA \
+    --poolSize 9 \
     --poolStride 9 \
     --patchSize 7 > $LOG_DIR/$LOG_FILE
 done
