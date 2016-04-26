@@ -1,11 +1,7 @@
 package nodes.images
 
-import breeze.linalg.DenseVector
-import pipelines._
 import utils._
 import workflow.Transformer
-
-import net.jafama
 
 /**
   * This node takes an image and performs pooling on regions of the image.
