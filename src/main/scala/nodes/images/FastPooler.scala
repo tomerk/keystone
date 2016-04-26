@@ -5,6 +5,8 @@ import pipelines._
 import utils._
 import workflow.Transformer
 
+import net.jafama
+
 /**
   * This node takes an image and performs pooling on regions of the image.
   *
@@ -38,8 +40,10 @@ class FastPooler(
   def determineOutputBuckets(coord: Int, ranges: Seq[((Int,Int), Int)]): Array[Int] = {
     ranges.filter{ case ((b,e),i) => coord >= b && coord < e}.map(_._2).toArray
   }
-  val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray//.map(_.head)
-  val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray//.map(_.head)
+  val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray.map(_.head)
+  val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray.map(_.head)
+  //val xps = xPools.map(_.length)
+  //val yps = yPools.map(_.length)
 
   val xDim = imageMeta.xDim
   val yDim = imageMeta.yDim
@@ -53,41 +57,54 @@ class FastPooler(
 
 
   def apply(image: Image): Image = {
-    val outputImage = RowMajorArrayVectorizedImage(Array.fill(numPoolsX*numPoolsY*numChannels*2)(0.0), outmeta)
+
+
+    val outdata = Array.fill(numPoolsX*numPoolsY*numChannels*2)(0.0)
+    val outputImage = RowMajorArrayVectorizedImage(outdata, outmeta)
+    //val indata = image.toArray
 
     var x, y, c, xp, yp, xPool, yPool = 0
-    var i = 0
+    var pix, upval, downval = 0.0
+    var coffu,coffd=0
+
     while (c < numChannels) {
       y = 0
+      coffu=2*c*numPoolsX*numPoolsY
+      coffd=coffu+(numPoolsX*numPoolsY)
+
       while (y < yDim) {
         x = 0
+
         while(x < xDim) {
 
           //Do symmetric rectification
-          val pix = image.get(x,y,c)
-          val upval = math.max(maxVal, pix-alpha)
-          val downval = math.max(maxVal, -pix - alpha)
+          pix = image.get(x,y,c)
+          //val pix = indata(x+y*xDim+c*xDim*yDim)
+          upval = math.max(maxVal, pix-alpha)
+          downval = math.min(maxVal, -pix- alpha)
 
           //Put the pixel in all appropriate pools
-          yp = 0
-          while (yp < yPools(y).length) {
-            yPool = yPools(y)(yp)
-
-            xp = 0
-            while (xp < xPools(x).length) {
-              xPool = xPools(x)(xp)
-              outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
-              outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
-              i+=1
-
-              xp+=1
-            }
-            yp+=1
-          }
-//          xPool = xPools(x)
+//          yp = 0
+//          while (yp < yps(y)) {
+//            yPool = yPools(y)(yp)
 //
-//          outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
-//          outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
+//            xp = 0
+//            while (xp < xps(x)) {
+//              xPool = xPools(x)(xp)
+//              outdata(xPool+yPool*numPoolsX+coffu) += upval
+//              outdata(xPool+yPool*numPoolsX+coffd) += downval
+//              //outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
+//              //outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
+//              //i+=1
+//
+//              xp+=1
+//            }
+//            yp+=1
+//          }
+          xPool = xPools(x)
+
+          outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
+          outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
 
           x+=1
         }
@@ -95,6 +112,7 @@ class FastPooler(
       }
       c+=1
     }
+
 
     outputImage
   }
