@@ -2,6 +2,7 @@ package nodes.images
 
 import breeze.linalg.{DenseVector, sum}
 import nodes._
+import nodes.images.external.NativePooler
 import org.scalatest.FunSuite
 import pipelines.Logging
 import utils.{ChannelMajorArrayVectorizedImage, ImageMetadata}
@@ -82,5 +83,30 @@ class PoolingSuite extends FunSuite with Logging {
         s"Mismatch at ($x,$y,$c): good: ${goodOutput.get(x,y,c)}, bad: ${badOutput.get(x,y,c)}")
     }
 
+  }
+
+  test("some pooling configs") {
+    for(
+      config <- Array((9,9,18), (9, 10, 19), (10,10,20))
+    ) {
+      val (patchStride, patchSize, imsize) = config
+      val im = ImageMetadata(imsize, imsize, 20)
+      val pooler = new FastPooler(patchStride, patchSize, 0.0, 0.25, im)
+      logInfo(s"$patchStride $patchSize $imsize ${pooler.xPools.mkString(",")}")
+    }
+  }
+
+  test("SymmetricRectifier/Pooler and NativePooler should be the same") {
+    val (x,y,c) = (19, 19, 10)
+
+    val baseImage = utils.TestUtils.genRowMajorArrayVectorizedImage(x,y,c)
+
+    val pipe = SymmetricRectifier(alpha=0.25) andThen new Pooler(9, 10, identity, Pooler.sumVector)
+
+    val goodOutput = pipe(baseImage)
+
+    val badOutput = new NativePooler(9, 10, 0.0, 0.25, ImageMetadata(x,y,c)).apply(baseImage)
+
+    assert(goodOutput.equals(badOutput))
   }
 }

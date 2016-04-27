@@ -22,8 +22,8 @@ CC = g++
 # Auto-detect architecture
 UNAME := $(shell uname -sm)
 
-Darwin_x86_64_CFLAGS := -O2
-Linux_x86_64_CFLAGS := -O2 -fPIC -fopenmp -shared
+Darwin_x86_64_CFLAGS := -O3 -ffast-math -g
+Linux_x86_64_CFLAGS := -O3 -fPIC -fopenmp -shared -ffast-math
 
 CFLAGS ?= $($(shell echo "$(UNAME)" | tr \  _)_CFLAGS)
 
@@ -53,7 +53,7 @@ SRCDIR := src/main/cpp
 ODIR := $(TMPDIR)/obj
 LDIR := lib
 
-_OBJ := VLFeat.o EncEval.o
+_OBJ := VLFeat.o EncEval.o NativePooler.o
 OBJ := $(addprefix $(ODIR)/,$(_OBJ))
 
 _EVDEPS := gmm.o fisher.o stat.o simd_math.o
@@ -71,6 +71,9 @@ $(SRCDIR)/EncEval.h: $(TARGET_JAR) src/main/scala/utils/external/EncEval.scala
 
 $(SRCDIR)/VLFeat.h: $(TARGET_JAR) src/main/scala/utils/external/VLFeat.scala
 	CLASSPATH=$< javah -o $@ utils.external.VLFeat
+
+$(SRCDIR)/NativePooler.h: $(TARGET_JAR) src/main/scala/utils/external/NativePooler.scala
+	CLASSPATH=$< javah -o $@ utils.external.NativePooler
 
 $(VLFEATDIR):
 	mkdir -p $(VLFEATDIR)
