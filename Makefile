@@ -22,7 +22,7 @@ CC = g++
 # Auto-detect architecture
 UNAME := $(shell uname -sm)
 
-Darwin_x86_64_CFLAGS := -O3 -ffast-math -g
+Darwin_x86_64_CFLAGS := -O3 -ffast-math
 Linux_x86_64_CFLAGS := -O3 -fPIC -fopenmp -shared -ffast-math
 
 CFLAGS ?= $($(shell echo "$(UNAME)" | tr \  _)_CFLAGS)

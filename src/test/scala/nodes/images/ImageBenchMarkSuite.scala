@@ -2,6 +2,7 @@ package nodes.images
 
 import breeze.linalg._
 import breeze.stats._
+import nodes.images.external.NativePooler
 import nodes.learning.ZCAWhitener
 import org.apache.spark.SparkContext
 import org.scalatest.FunSuite
@@ -9,6 +10,7 @@ import pipelines.{LocalSparkContext, Logging}
 import pipelines.images.cifar.RandomPatchCifarRawAugmentLazy.RandomCifarFeaturizerConfig
 import utils._
 import utils.TestUtils._
+import workflow.{Pipeline, Transformer}
 
 import scala.util.Random
 
@@ -150,7 +152,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
    }
 
   test("Pooler benchmark") {
-    def poolTime(x: RowMajorArrayVectorizedImage, pooler: FastPooler) = {
+    def poolTime(x: RowMajorArrayVectorizedImage, pooler: Pipeline[Image,Image]) = {
 
       val start = System.nanoTime
       val res = pooler(x)
@@ -162,7 +164,13 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
 
     val conf = RandomCifarFeaturizerConfig()
     val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, ImageMetadata(24-6+1, 24-6+1, 512))
+    val pooler2 = new NativePooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, ImageMetadata(19,19,512))
+    val pooler3 = SymmetricRectifier(0.0, conf.alpha) andThen new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector)
+
+    val poolers: Array[(String, Pipeline[Image, Image])] = Array(("fast",pooler), ("native", pooler2), ("standard", pooler3))
+
     val res = for(
+      p <- poolers;
       iter <- 1 to 100;
       t <- tests
     ) yield {
@@ -176,18 +184,18 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
 
 
       //val pooler = new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector)
-      val (t1, res) = poolTime(img, pooler)
+      val (t1, res) = poolTime(img, p._2)
       //logInfo(s"$t1, $gbs, ${res.get(1,1,1)}, ${gbs.toDouble/t1}")
 
-      (t.name, t1, gbs, gbs.toDouble/t1)
+      (t.name, p._1, t1, gbs, gbs.toDouble/t1)
     }
 
-    val groups = res.groupBy(_._1)
+    val groups = res.groupBy(x => (x._1,x._2))
 
     logInfo(Seq("name","max(gbs)","median(gbs)","stddev(gbs)").mkString(","))
     groups.foreach { case (name, values) =>
-      val gBytesPerSec = DenseVector(values.map(_._4):_*)
-      val times = DenseVector(values.map(_._2.toDouble):_*)
+      val gBytesPerSec = DenseVector(values.map(_._5):_*)
+      val times = DenseVector(values.map(_._3.toDouble):_*)
       val maxgbs = max(gBytesPerSec)
       val medgbs = median(gBytesPerSec)
       val stddevgbs = stddev(gBytesPerSec)

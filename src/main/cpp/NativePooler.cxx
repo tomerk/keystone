@@ -68,7 +68,7 @@ int **getPoolAssignments(int strideStart, int dim, int poolStride) {
     if (i == 9) {
       ptr = (int *) malloc(sizeof(int) * 2);
       ptr[0]=0;
-      ptr[0]=1;
+      ptr[1]=1;
     } else {
       ptr = (int *) malloc(sizeof(int) * 1);
       if (i < 9) ptr[0] = 0; else ptr[0] = 1;
@@ -99,7 +99,7 @@ JNIEXPORT jdoubleArray JNICALL Java_utils_external_NativePooler_pool
   int yps[19] = {1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1};
 
 
-  double *res= (double *) malloc(sizeof(double)*numPoolsX*numPoolsY*m.numChannels);
+  double *res= (double *) malloc(sizeof(double)*numPoolsX*numPoolsY*m.numChannels*2);
 
   //Get no-copy pointer to im.
   jdouble * image = (jdouble *) env->GetPrimitiveArrayCritical(im, JNI_FALSE);

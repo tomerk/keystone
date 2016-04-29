@@ -36,10 +36,10 @@ class FastPooler(
   def determineOutputBuckets(coord: Int, ranges: Seq[((Int,Int), Int)]): Array[Int] = {
     ranges.filter{ case ((b,e),i) => coord >= b && coord <= e}.map(_._2).toArray
   }
-  val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray.map(_.head)
-  val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray.map(_.head)
-  //val xps = xPools.map(_.length)
-  //val yps = yPools.map(_.length)
+  val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray//.map(_.head)
+  val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray//.map(_.head)
+  val xps = xPools.map(_.length)
+  val yps = yPools.map(_.length)
 
   val xDim = imageMeta.xDim
   val yDim = imageMeta.yDim
@@ -72,35 +72,35 @@ class FastPooler(
         x = 0
 
         while(x < xDim) {
-//
-//          //Do symmetric rectification
-//          pix = image.get(x,y,c)
-//          //val pix = indata(x+y*xDim+c*xDim*yDim)
-//          upval = math.max(maxVal, pix-alpha)
-//          downval = math.min(maxVal, -pix- alpha)
-//
-//          //Put the pixel in all appropriate pools
-//          yp = 0
-//          while (yp < yps(y)) {
-//            yPool = yPools(y)(yp)
-//
-//            xp = 0
-//            while (xp < xps(x)) {
-//              xPool = xPools(x)(xp)
-//              outdata(xPool+yPool*numPoolsX+coffu) += upval
-//              outdata(xPool+yPool*numPoolsX+coffd) += downval
-//              //outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
-//              //outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
-//              //i+=1
-//
-//              xp+=1
-//            }
-//            yp+=1
-//          }
-          xPool = xPools(x)
 
-          outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
-          outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
+          //Do symmetric rectification
+          pix = image.get(x,y,c)
+          //val pix = indata(x+y*xDim+c*xDim*yDim)
+          upval = math.max(maxVal, pix-alpha)
+          downval = math.min(maxVal, -pix- alpha)
+
+          //Put the pixel in all appropriate pools
+          yp = 0
+          while (yp < yps(y)) {
+            yPool = yPools(y)(yp)
+
+            xp = 0
+            while (xp < xps(x)) {
+              xPool = xPools(x)(xp)
+              outdata(xPool+yPool*numPoolsX+coffu) += upval
+              outdata(xPool+yPool*numPoolsX+coffd) += downval
+              //outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
+              //outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
+              //i+=1
+
+              xp+=1
+            }
+            yp+=1
+          }
+//          xPool = xPools(x)
+//
+//          outputImage.put(xPool,yPool,2*c, outputImage.get(xPool,yPool,2*c)+upval)
+//          outputImage.put(xPool,yPool,2*c+1, outputImage.get(xPool,yPool,2*c+1)+downval)
 
           x+=1
         }

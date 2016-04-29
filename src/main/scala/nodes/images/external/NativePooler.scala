@@ -12,13 +12,13 @@ import workflow.Transformer
   *
   */
 class NativePooler(val poolStride: Int, val poolSize: Int, val maxVal: Double = 0.0, val alpha: Double = 0.25, val meta: ImageMetadata)
-  extends Transformer[RowMajorArrayVectorizedImage, Image] {
+  extends Transformer[Image, Image] {
   @transient lazy val extLib = new external.NativePooler()
 
-  def apply(in: RowMajorArrayVectorizedImage): Image = {
+  def apply(in: Image): Image = {
     val rawDescDataShort = extLib.pool(meta.xDim, meta.yDim, meta.numChannels, poolStride, poolSize, maxVal, alpha, in.toArray)
 
-    new RowMajorArrayVectorizedImage(rawDescDataShort, ImageMetadata(2, 2, meta.numChannels))
+    new RowMajorArrayVectorizedImage(rawDescDataShort, ImageMetadata(2, 2, 2*meta.numChannels))
   }
 }
 
