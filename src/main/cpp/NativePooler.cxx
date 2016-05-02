@@ -16,7 +16,7 @@ typedef struct Metas {
 } Meta;
 
 int pooler(double *output, double *image, int poolStride, int poolSize, double maxVal, double alpha, int **xPools, int **yPools, int *xps, int *yps, Meta meta) {
-  int c, x, y, xp, yp, xPool, yPool  = 0;
+  int c=0, x=0, y=0, xp=0, yp=0, xPool=0, yPool  = 0;
   double pix, upval, downval = 0.0;
 
   while (c < meta.numChannels) {
