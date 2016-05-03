@@ -16,8 +16,16 @@ typedef struct Metas {
 } Meta;
 
 int pooler(double *output, double *image, int poolStride, int poolSize, double maxVal, double alpha, int **xPools, int **yPools, int *xps, int *yps, Meta meta) {
-  int c, x, y, xp, yp, xPool, yPool  = 0;
-  double pix, upval, downval = 0.0;
+  int c = 0;
+  int x = 0;
+  int y = 0;
+  int xp = 0;
+  int yp = 0;
+  int xPool = 0;
+  int yPool  = 0;
+  double pix = 0.0;
+  double upval = 0.0;
+  double downval = 0.0;
 
   while (c < meta.numChannels) {
     y = 0;
@@ -27,8 +35,8 @@ int pooler(double *output, double *image, int poolStride, int poolSize, double m
 
         //Do symmetric rectification
         pix = image[x+y*meta.xDim+c*meta.xDim*meta.yDim];
-        upval = fmax(0.0, pix-alpha);
-        downval = fmax(0.0, -pix - alpha);
+        upval = fmax(maxVal, pix-alpha);
+        downval = fmax(maxVal, -pix - alpha);
 
         //Put the pixel in all appropriate pools
         yp = 0;
@@ -56,14 +64,12 @@ int pooler(double *output, double *image, int poolStride, int poolSize, double m
 }
 
 int **getPoolAssignments(int strideStart, int dim, int poolStride) {
-  int i, curPoolSize;
-
   int numPools = (dim - strideStart)/poolStride;
 
   int **res = (int **) malloc(sizeof(int *) * dim);
 
 
-  for(i = 0; i < dim; i++) {
+  for(int i = 0; i < dim; i++) {
     int *ptr;
     if (i == 9) {
       ptr = (int *) malloc(sizeof(int) * 2);
@@ -99,7 +105,7 @@ JNIEXPORT jdoubleArray JNICALL Java_utils_external_NativePooler_pool
   int yps[19] = {1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1};
 
 
-  double *res= (double *) malloc(sizeof(double)*numPoolsX*numPoolsY*m.numChannels*2);
+  double *res= (double *) calloc(numPoolsX*numPoolsY*m.numChannels*2, sizeof(double));
 
   //Get no-copy pointer to im.
   jdouble * image = (jdouble *) env->GetPrimitiveArrayCritical(im, JNI_FALSE);
@@ -110,7 +116,7 @@ JNIEXPORT jdoubleArray JNICALL Java_utils_external_NativePooler_pool
   //Release handle on image.
   env->ReleasePrimitiveArrayCritical(im, image, JNI_FALSE);
 
-  int result_length = 2*2*numChannels;
+  int result_length = 2*2*numChannels*2;
   jdoubleArray result = env->NewDoubleArray(result_length);
   env->SetDoubleArrayRegion(result, 0, result_length, res);
 

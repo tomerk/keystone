@@ -258,6 +258,10 @@ case class RowMajorArrayVectorizedImage(
   override def putInVector(vectorIdx: Int, newVal: Double) = {
     vectorizedImage(vectorIdx) = newVal
   }
+
+  override def toArray: Array[Double] = {
+    vectorizedImage.clone()
+  }
 }
 
 

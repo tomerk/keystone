@@ -164,7 +164,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging with LocalSparkContext {
 
     val conf = RandomCifarFeaturizerConfig()
     val pooler = new FastPooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, ImageMetadata(24-6+1, 24-6+1, 512))
-    val pooler2 = new NativePooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha, ImageMetadata(19,19,512))
+    val pooler2 = new NativePooler(conf.poolStride, conf.poolSize, 0.0, conf.alpha)
     val pooler3 = SymmetricRectifier(0.0, conf.alpha) andThen new Pooler(conf.poolStride, conf.poolSize, identity, Pooler.sumVector)
 
     val poolers: Array[(String, Pipeline[Image, Image])] = Array(("fast",pooler), ("native", pooler2), ("standard", pooler3))

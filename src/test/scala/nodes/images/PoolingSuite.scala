@@ -5,7 +5,7 @@ import nodes._
 import nodes.images.external.NativePooler
 import org.scalatest.FunSuite
 import pipelines.Logging
-import utils.{ChannelMajorArrayVectorizedImage, ImageMetadata}
+import utils.{ChannelMajorArrayVectorizedImage, ImageMetadata, RowMajorArrayVectorizedImage}
 
 class PoolingSuite extends FunSuite with Logging {
 
@@ -96,6 +96,64 @@ class PoolingSuite extends FunSuite with Logging {
     }
   }
 
+  test("SymmetricRectifier/Pooler should work with multiple channels") {
+    val (x,y,numChannels) = (19, 19, 10)
+
+    val baseImage = utils.TestUtils.genRowMajorArrayVectorizedImage(x,y,numChannels)
+
+    val channelImages = (0 until numChannels).map { channel =>
+      val channelImage = RowMajorArrayVectorizedImage(new Array(x * y), ImageMetadata(x,y,1))
+      for (xPos <- 0 until x;
+           yPos <- 0 until y) {
+        channelImage.put(xPos, yPos, 0, baseImage.get(xPos, yPos, channel))
+      }
+      channelImage
+    }
+
+    val pipe = SymmetricRectifier(alpha=0.25, maxVal = -0.5) andThen new Pooler(9, 10, identity, Pooler.sumVector)
+
+    val fullImage = pipe(baseImage)
+    val pooledChannels = channelImages.map(image => pipe(image))
+
+    for(x <- 0 until fullImage.metadata.xDim;
+        y <- 0 until fullImage.metadata.yDim;
+        c <- 0 until numChannels;
+        r <- 0 until 2) {
+      assert(fullImage.get(x,y,c + numChannels*r) == pooledChannels(c).get(x,y,r),
+        s"Mismatch at ($x,$y,$c,$r): good: ${fullImage.get(x,y,c + numChannels*r)}, " +
+          s"bad: ${pooledChannels(c).get(x,y,r)}")
+    }
+  }
+
+  test("NativePooler should work with multiple channels") {
+    val (x,y,numChannels) = (19, 19, 10)
+
+    val baseImage = utils.TestUtils.genRowMajorArrayVectorizedImage(x,y,numChannels)
+
+    val channelImages = (0 until numChannels).map { channel =>
+      val channelImage = RowMajorArrayVectorizedImage(new Array(x * y), ImageMetadata(x,y,1))
+      for (xPos <- 0 until x;
+           yPos <- 0 until y) {
+        channelImage.put(xPos, yPos, 0, baseImage.get(xPos, yPos, channel))
+      }
+      channelImage
+    }
+
+    val pipe = new NativePooler(9, 10, 0.0, 0.25)
+
+    val fullImage = pipe(baseImage)
+    val pooledChannels = channelImages.map(image => pipe(image))
+
+    for(x <- 0 until fullImage.metadata.xDim;
+        y <- 0 until fullImage.metadata.yDim;
+        c <- 0 until numChannels;
+        r <- 0 until 2) {
+      assert(fullImage.get(x,y,c + numChannels*r) == pooledChannels(c).get(x,y,r),
+        s"Mismatch at ($x,$y,$c,$r): good: ${fullImage.get(x,y,c + numChannels*r)}, " +
+          s"bad: ${pooledChannels(c).get(x,y,r)}")
+    }
+  }
+
   test("SymmetricRectifier/Pooler and NativePooler should be the same") {
     val (x,y,c) = (19, 19, 10)
 
@@ -105,8 +163,13 @@ class PoolingSuite extends FunSuite with Logging {
 
     val goodOutput = pipe(baseImage)
 
-    val badOutput = new NativePooler(9, 10, 0.0, 0.25, ImageMetadata(x,y,c)).apply(baseImage)
+    val badOutput = new NativePooler(9, 10, 0.0, 0.25).apply(baseImage)
 
-    assert(goodOutput.equals(badOutput))
+    for(x <- 0 until goodOutput.metadata.xDim;
+        y <- 0 until goodOutput.metadata.yDim;
+        c <- 0 until goodOutput.metadata.numChannels) {
+      assert(goodOutput.get(x,y,c) == badOutput.get(x,y,c),
+        s"Mismatch at ($x,$y,$c): good: ${goodOutput.get(x,y,c)}, bad: ${badOutput.get(x,y,c)}")
+    }
   }
 }
