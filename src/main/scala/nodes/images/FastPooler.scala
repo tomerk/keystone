@@ -34,10 +34,11 @@ class FastPooler(
   val yPoolRanges = yPoolStarts.map(y => (y-poolSize/2, math.min(y + poolSize / 2, imageMeta.yDim))).zipWithIndex
 
   def determineOutputBuckets(coord: Int, ranges: Seq[((Int,Int), Int)]): Array[Int] = {
-    ranges.filter{ case ((b,e),i) => coord >= b && coord <= e}.map(_._2).toArray
+    ranges.filter{ case ((b,e),i) => coord >= b && coord < e}.map(_._2).toArray
   }
   val xPools = (0 until imageMeta.xDim).map(c => determineOutputBuckets(c, xPoolRanges)).toArray//.map(_.head)
   val yPools = (0 until imageMeta.yDim).map(c => determineOutputBuckets(c, yPoolRanges)).toArray//.map(_.head)
+  println(xPools.map(_.mkString(",")).mkString(";"))
   val xps = xPools.map(_.length)
   val yps = yPools.map(_.length)
 
@@ -65,8 +66,6 @@ class FastPooler(
 
     while (c < numChannels) {
       y = 0
-      coffu=2*c*numPoolsX*numPoolsY
-      coffd=coffu+(numPoolsX*numPoolsY)
 
       while (y < yDim) {
         x = 0
@@ -77,7 +76,7 @@ class FastPooler(
           pix = image.get(x,y,c)
           //val pix = indata(x+y*xDim+c*xDim*yDim)
           upval = math.max(maxVal, pix-alpha)
-          downval = math.min(maxVal, -pix- alpha)
+          downval = math.max(maxVal, -pix - alpha)
 
           //Put the pixel in all appropriate pools
           yp = 0
