@@ -28,13 +28,11 @@ object VOCSIFTFisher extends Serializable with Logging {
       VOCDataPath(conf.trainLocation, "VOCdevkit/VOC2007/JPEGImages/", Some(1)),
       VOCLabelPath(conf.labelPath)).repartition(conf.numParts).cache()
 
-    val labelGrabber = MultiLabelExtractor andThen
-      ClassLabelIndicatorsFromIntArrayLabels(VOCLoader.NUM_CLASSES) andThen
-      new Cacher
-
-    val trainingLabels = labelGrabber(parsedRDD)
-    val trainingData = MultiLabeledImageExtractor(parsedRDD)
-    val numTrainingImages = trainingData.count().toInt
+    val labelGrabber = MultiLabelExtractor andThen new Cacher // Slight modification of label grabber to make sure to get int array for train labels at the end for eval
+    val trainActuals = labelGrabber(parsedRDD) // newly added code to return a promise of int array train labels.
+    val trainingLabels = ClassLabelIndicatorsFromIntArrayLabels(VOCLoader.NUM_CLASSES).apply(labelGrabber(parsedRDD)) // Previously an RDD[Labels] now a Promise[RDD[Labels]]
+    val trainingData = MultiLabeledImageExtractor(parsedRDD) // Previously an RDD[Image], now a Promise[RDD[Image]]
+    val numTrainingImages = parsedRDD.count().toInt // Previously `trainingData.count().toInt`, can no longer do because trainingData is now a promise
     val numPCASamplesPerImage = conf.numPcaSamples / numTrainingImages
     val numGMMSamplesPerImage = conf.numGmmSamples / numTrainingImages
 
@@ -50,11 +48,10 @@ object VOCSIFTFisher extends Serializable with Logging {
       case Some(fname) =>
         siftExtractor andThen new BatchPCATransformer(convert(csvread(new File(fname)), Float).t)
       case None =>
-        val pca = siftExtractor andThen
-            ColumnSampler(numPCASamplesPerImage) andThen
-            (ColumnPCAEstimator(conf.descDim), trainingData)
-
-        siftExtractor andThen pca.fittedTransformer
+        val columnSampler = ColumnSampler(numPCASamplesPerImage) // A column sampling transformer
+        val pcaTrainData = columnSampler(siftExtractor(trainingData)) // A promise of column-sampled sift data
+        val pca = ColumnPCAEstimator(conf.descDim).fit(pcaTrainData) // A pipeline that does the pca transform on Sift features
+        siftExtractor andThen pca // Pipeline that does raw data -> sift features then applies PCA
     }) andThen new Cacher
 
     // Part 2a: If necessary, compute a GMM based on the dimensionality-reduced features, or load from disk.
@@ -67,10 +64,10 @@ object VOCSIFTFisher extends Serializable with Logging {
           csvread(new File(conf.gmmWtsFile.get)).toDenseVector)
         pcaFeaturizer andThen FisherVector(gmm)
       case None =>
-        val fisherVector = pcaFeaturizer andThen
-            ColumnSampler(numGMMSamplesPerImage) andThen
-            (GMMFisherVectorEstimator(conf.vocabSize), trainingData)
-        pcaFeaturizer andThen fisherVector.fittedTransformer
+        val columnSampler = ColumnSampler(numGMMSamplesPerImage) // A column sampling transformer
+        val fisherVecTrainData = columnSampler(pcaFeaturizer(trainingData)) // A promise of column-sampled, pca-transformed sifts
+        val fisherVector = GMMFisherVectorEstimator(conf.vocabSize).fit(fisherVecTrainData) // A pipeline that gets fisher vectors from pca-transformed sifts
+        pcaFeaturizer andThen fisherVector // Pipeline that does raw data -> fisher vectors
     }) andThen
         FloatToDouble andThen
         MatrixVectorizer andThen
@@ -85,23 +82,28 @@ object VOCSIFTFisher extends Serializable with Logging {
         trainingData,
         trainingLabels)
 
-    // Now featurize and apply the model to test data.
+    // Now featurize and apply the model to train & test data.
+    val trainPredictions = predictor(trainingData) // W/ previous APIs, this would not take any advantage of all the explicitly specified caching! Now is a promise of train predictions.
     val testParsedRDD = VOCLoader(
       sc,
       VOCDataPath(conf.testLocation, "VOCdevkit/VOC2007/JPEGImages/", Some(1)),
       VOCLabelPath(conf.labelPath)).repartition(conf.numParts)
 
-    val testData = MultiLabeledImageExtractor(testParsedRDD)
+    val testData = MultiLabeledImageExtractor(testParsedRDD) // Previously returned raw test data. Now returns a promise of raw test data.
 
-    logInfo("Test Cached RDD has: " + testData.count)
+    val testActuals = labelGrabber(testParsedRDD) // Previously returned test labels. Now a promise of test labels.
+    logInfo("Test Cached RDD has: " + testParsedRDD.count) // Previously `logInfo("Test Cached RDD has: " + testData.count)`. Changed because testData is now a promis
 
-    val testActuals = MultiLabelExtractor(testParsedRDD)
+    val testPredictions = predictor(testData) // Previously returned raw test predictions. Now returns a promise of raw test data.
+    Pipeline.session(Seq(trainPredictions, trainActuals, testPredictions, testActuals), DefaultOptimizer) // Newly added code to specify session
 
-    val predictions = predictor(testData)
+    val trainMap = MeanAveragePrecisionEvaluator(trainActuals.get(), trainPredictions.get(), VOCLoader.NUM_CLASSES) // Newly added eval of train data
+    logInfo(s"TRAIN APs are: ${trainMap.toArray.mkString(",")}")
+    logInfo(s"TRAIN MAP is: ${mean(trainMap)}")
 
-    val map = MeanAveragePrecisionEvaluator(testActuals, predictions, VOCLoader.NUM_CLASSES)
-    logInfo(s"TEST APs are: ${map.toArray.mkString(",")}")
-    logInfo(s"TEST MAP is: ${mean(map)}")
+    val testMap = MeanAveragePrecisionEvaluator(testActuals.get(), testPredictions.get(), VOCLoader.NUM_CLASSES) // test eval, modified to thunk promises
+    logInfo(s"TEST APs are: ${testMap.toArray.mkString(",")}")
+    logInfo(s"TEST MAP is: ${mean(testMap)}")
 
     predictor
   }

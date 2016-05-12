@@ -37,13 +37,15 @@ object RandomPatchCifar extends Serializable with Logging {
       new Cacher[DenseVector[Double]]
 
     val trainLabels = labelExtractor(trainData)
-
-    val patchExtractor = new Windower(conf.patchSteps, conf.patchSize)
-      .andThen(ImageVectorizer.apply)
-      .andThen(new Sampler(whitenerSize))
-
-    val (filters, whitener): (DenseMatrix[Double], ZCAWhitener) = {
-        val baseFilters = patchExtractor(trainImages)
+    // Previously this was effectively an inlined estimator fit.
+    // Because trainImages is now a promise, the code that accesses trainImages
+    // directly must be moved into an Estimator.
+    val patchConvolverEstimator = new Estimator[Image, Image] {
+      override protected def fitRDD(data: RDD[Image]): Transformer[Image, Image] = {
+        val patchExtractor = new Windower(conf.patchSteps, conf.patchSize)
+          .andThen(ImageVectorizer.apply)
+          .andThen(new Sampler(whitenerSize))
+        val baseFilters = patchExtractor(data)
         val baseFilterMat = Stats.normalizeRows(MatrixUtils.rowsToMatrix(baseFilters), 10.0)
         val whitener = new ZCAWhitenerEstimator(eps=conf.whiteningEpsilon).fitSingle(baseFilterMat)
 
@@ -52,12 +54,13 @@ object RandomPatchCifar extends Serializable with Logging {
         val unnormFilters = whitener(sampleFilters)
         val unnormSq = pow(unnormFilters, 2.0)
         val twoNorms = sqrt(sum(unnormSq(*, ::)))
-
-        ((unnormFilters(::, *) / (twoNorms + 1e-10)) * whitener.whitener.t, whitener)
+        val filters = (unnormFilters(::, *) / (twoNorms + 1e-10)) * whitener.whitener.t
+        new Convolver(filters, imageSize, imageSize, numChannels, Some(whitener), true)
+      }
     }
 
     val predictionPipeline =
-        new Convolver(filters, imageSize, imageSize, numChannels, Some(whitener), true) andThen
+        new patchConvolverEstimator.fit(trainImages) andThen
         SymmetricRectifier(alpha=conf.alpha) andThen
         new Pooler(conf.poolStride, conf.poolSize, identity, _.sum) andThen
         ImageVectorizer andThen
@@ -69,15 +72,18 @@ object RandomPatchCifar extends Serializable with Logging {
         new Cacher[Int]
 
     // Calculate training error.
-    val trainEval = MulticlassClassifierEvaluator(
-      predictionPipeline(trainImages), LabelExtractor(trainData), numClasses)
+    val trainPredictions = predictionPipeline(trainImages)
+    val trainIntLabels = LabelExtractor(trainData)
+    Pipeline.session(Seq(trainPredictions, trainIntLabels, testPredictions, testLabels), DefaultOptimizer) // Add the session call
 
     // Do testing.
     val testData = CifarLoader(sc, conf.testLocation)
     val testImages = ImageExtractor(testData)
-    val testLabels = labelExtractor(testData)
-
-    val testEval = MulticlassClassifierEvaluator(predictionPipeline(testImages), LabelExtractor(testData), numClasses)
+    val testPredictions = predictionPipeline(testImages)
+    val testLabels = LabelExtractor(testData)
+    val trainEval = MulticlassClassifierEvaluator(
+      trainPredictions.get(), trainIntLabels.get(), numClasses)
+    val testEval = MulticlassClassifierEvaluator(testPredictions.get(), testLabels.get(), numClasses)
 
     logInfo(s"Training error is: ${trainEval.totalError}")
     logInfo(s"Test error is: ${testEval.totalError}")
