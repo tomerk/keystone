@@ -296,7 +296,7 @@ object Pipeline {
     }
   }
 
-  def tie(graphBackedExecutions: Seq[GraphBackedExecution], optimizer: Option[Optimizer]): Unit = {
+  def session(graphBackedExecutions: Seq[GraphBackedExecution], optimizer: Option[Optimizer]): Unit = {
     GraphBackedExecution.tie(graphBackedExecutions, optimizer)
   }
 }
