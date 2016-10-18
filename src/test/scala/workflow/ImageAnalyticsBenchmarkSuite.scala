@@ -113,9 +113,9 @@ class ImageAnalyticsBenchmarkSuite extends FunSuite with PipelineContext with Lo
   test("Operate on padded chunks of slices, don't know if funcs are reduceable") {
     sc = new SparkContext("local[4]", "test")
 
-    val chunkSize = 32
+    val chunkSize = 16
     val padding = Conf.sliceWindow / 2
-    require(chunkSize > padding)
+    require(chunkSize > Conf.sliceWindow)
 
     logInfo("now starting")
 
