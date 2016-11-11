@@ -4,7 +4,7 @@ import java.io.File
 
 import breeze.linalg._
 import breeze.stats.distributions.{Rand, RandBasis}
-import org.apache.spark.SparkContext
+import org.apache.spark.{HashPartitioner, SparkContext}
 import org.scalatest.FunSuite
 import pipelines.Logging
 import utils.{ChannelMajorArrayVectorizedImage, ImageMetadata, _}
@@ -16,6 +16,43 @@ case class SliceChunk(subject: Int, firstNotPad: Int, slices: Map[Int, DenseMatr
 // the slices are already stored.
 
 class ImageAnalyticsBenchmarkSuite extends FunSuite with PipelineContext with Logging with Serializable {
+
+  test("Simulated Sky Source Detect") {
+    sc = new SparkContext("local[4]", "test")
+    val sky = csvread(new File("/Users/tomerk11/Desktop/simulatedsky.csv"), separator = ' ')
+
+    val skyRDD = sc.parallelize(Seq(sky))
+
+    val patchSize = 400
+    val repeatsX = 4
+    val repeatsY = 3
+
+    val numPatchesX = sky.cols / patchSize
+    val numPatchesY = sky.rows / patchSize
+
+    val patchRDD = skyRDD.flatMap(sky => (0 until repeatsX * numPatchesX).iterator.flatMap(patchIdX => (0 until repeatsY * numPatchesY).iterator.map {
+      patchIdY =>
+        val patchData = DenseMatrix.zeros[Double](patchSize, patchSize)
+        var patchX = 0
+        while (patchX < patchSize) {
+          var patchY = 0
+          while (patchY < patchSize) {
+            val skyX = patchX + (patchIdX % numPatchesX) * patchSize
+            val skyY = patchY + (patchIdY % numPatchesY) * patchSize
+            patchData(patchY, patchX) = sky(skyY, skyX)
+            patchY += 1
+          }
+          patchX += 1
+        }
+
+        ((patchIdX, patchIdY), patchData)
+    })).partitionBy(new HashPartitioner(12)).cache()
+
+    println(s"Size: ${patchRDD.count()}")
+
+    System.in.read()
+
+  }
 
   def generateVolumes(numSubjects: Int, slicesPerSubject: Int, sliceCols: Int, sliceRows: Int): Seq[Slice] = {
     val rand = RandBasis.mt0.gaussian
