@@ -15,6 +15,92 @@ case class SliceChunk(subject: Int, firstNotPad: Int, slices: Map[Int, DenseMatr
 // NOTE not using a "operate on each pixel as a tuple" because it is a super straw man in this case due to how
 // the slices are already stored.
 
+case class Overlap(originPatch: (Int, Int), data: DenseMatrix[Double])
+
+object Overlap extends Serializable {
+  def overlaps(patchId: (Int, Int), patch: DenseMatrix[Double], overlap: Int): Iterator[((Int, Int), Overlap)] = {
+    // All overlapping patches: left, right, bottom, top, top-left, top-right, bottom-left, bottom-right
+    Iterator("l", "r", "b", "t", "tl", "tr", "bl", "br").map {
+      case "l" =>
+        val overlapData = patch(::, 0 until overlap)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1 - 1, patchId._2), o)
+      case "r" =>
+        val overlapData = patch(::, patch.cols - overlap until patch.cols)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1 + 1, patchId._2), o)
+      case "b" =>
+        val overlapData = patch(patch.rows - overlap until patch.rows, ::)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1, patchId._2 + 1), o)
+      case "t" =>
+        val overlapData = patch(0 until overlap, ::)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1, patchId._2 - 1), o)
+      case "tl" =>
+        val overlapData = patch(0 until overlap, 0 until overlap)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1 - 1, patchId._2 - 1), o)
+      case "tr" =>
+        val overlapData = patch(0 until overlap, patch.cols - overlap until patch.cols)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1 + 1, patchId._2 - 1), o)
+      case "bl" =>
+        val overlapData = patch(patch.rows - overlap until patch.rows, 0 until overlap)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1 - 1, patchId._2 + 1), o)
+      case "br" =>
+        val overlapData = patch(patch.rows - overlap until patch.rows, patch.cols - overlap until patch.cols)
+        val o = Overlap(patchId, overlapData.copy)
+        ((patchId._1 + 1, patchId._2 + 1), o)
+    }
+  }
+
+  def buildChunkWithOverlapsThenApplyOp(patchId: (Int, Int), patch: DenseMatrix[Double], overlaps: TraversableOnce[Overlap], overlap: Int): ((Int, Int), DenseMatrix[Double]) = {
+    println(overlaps.size)//.map(_.originPatch).toList)
+    (patchId, patch)
+    /*val matToDoOp = DenseMatrix.zeros[Double](patch.rows + overlap * 2, patch.cols + overlap * 2)
+    matToDoOp(overlap until (patch.rows + overlap), overlap until (patch.cols + overlap)) := patch
+
+    overlaps.foreach {
+      case Overlap(pid, data) if pid == (patchId._1 - 1, patchId._2) =>
+        matToDoOp(overlap until (patch.rows + overlap), 0 until overlap) := data
+      case Overlap(pid, data) if pid == (patchId._1 + 1, patchId._2) =>
+        matToDoOp(overlap until (patch.rows + overlap), (patch.cols + overlap) until (patch.cols + overlap * 2)) := data
+      case Overlap(pid, data) if pid == (patchId._1, patchId._2 - 1) =>
+        matToDoOp(0 until overlap, overlap until (patch.cols + overlap)) := data
+      case Overlap(pid, data) if pid == (patchId._1, patchId._2 + 1) =>
+        matToDoOp((patch.rows + overlap) until (patch.rows + overlap * 2), overlap until (patch.cols + overlap)) := data
+      case Overlap(pid, data) if pid == (patchId._1 - 1, patchId._2 - 1) =>
+        matToDoOp(0 until overlap, 0 until overlap) := data
+      case Overlap(pid, data) if pid == (patchId._1 + 1, patchId._2 - 1) =>
+        matToDoOp(0 until overlap, (patch.cols + overlap) until (patch.cols + overlap * 2)) := data
+      case Overlap(pid, data) if pid == (patchId._1 - 1, patchId._2 + 1) =>
+        matToDoOp((patch.rows + overlap) until (patch.rows + overlap * 2), 0 until overlap) := data
+      case Overlap(pid, data) if pid == (patchId._1 + 1, patchId._2 + 1) =>
+        matToDoOp((patch.rows + overlap) until (patch.rows + overlap * 2), (patch.cols + overlap) until (patch.cols + overlap * 2)) := data
+    }
+
+    var row = overlap
+    while (row < patch.rows + overlap) {
+      var col = overlap
+      while (col < patch.cols + overlap) {
+        //if (matToDoOp(row, col) > 0) {
+          matToDoOp(row, col) = max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))
+        //}
+        col += 1
+      }
+      row += 1
+    }
+
+    (patchId, matToDoOp(overlap until (patch.rows + overlap), overlap until (patch.cols + overlap)))*/
+  }
+
+  def applyOpToChunkWithOverlaps(patch: ((Int, Int), DenseMatrix[Double]), overlaps: Iterable[((Int, Int), Overlap)], overlap: Int): ((Int, Int), DenseMatrix[Double]) = {
+    null
+  }
+}
+
 class ImageAnalyticsBenchmarkSuite extends FunSuite with PipelineContext with Logging with Serializable {
 
   test("Simulated Sky Source Detect") {
@@ -30,6 +116,7 @@ class ImageAnalyticsBenchmarkSuite extends FunSuite with PipelineContext with Lo
     val numPatchesX = sky.cols / patchSize
     val numPatchesY = sky.rows / patchSize
 
+    val partitioner = new HashPartitioner(12)
     val patchRDD = skyRDD.flatMap(sky => (0 until repeatsX * numPatchesX).iterator.flatMap(patchIdX => (0 until repeatsY * numPatchesY).iterator.map {
       patchIdY =>
         val patchData = DenseMatrix.zeros[Double](patchSize, patchSize)
@@ -46,11 +133,46 @@ class ImageAnalyticsBenchmarkSuite extends FunSuite with PipelineContext with Lo
         }
 
         ((patchIdX, patchIdY), patchData)
-    })).partitionBy(new HashPartitioner(12)).cache()
+    })).repartitionAndSortWithinPartitions(partitioner).cache()
 
-    println(s"Size: ${patchRDD.count()}")
+    patchRDD.count()
 
-    System.in.read()
+
+    var curIterRDD = patchRDD
+
+    (0 until 10).foreach { i =>
+      logInfo(s"Iter ${i}")
+      val prevRDD = curIterRDD
+      val overlapRDD = curIterRDD.flatMap(x => Overlap.overlaps(x._1, x._2, overlap = 1)).repartitionAndSortWithinPartitions(partitioner)
+      val qub = overlapRDD.mapPartitions(x => Iterator.single(x.map(_._1).toList)).first()
+      def zipFunc(itOne: Iterator[((Int, Int), DenseMatrix[Double])], itTwo: Iterator[((Int, Int), Overlap)]): Iterator[((Int, Int), DenseMatrix[Double])] = {
+        import scala.math.Ordering.Implicits._
+        itOne.map {
+          case (patchId, patch) =>
+            // TODO: Buffered takewhile! As is takewhile doesn't buffer, causing a bug
+            val overlaps = itTwo.dropWhile(_._1 < patchId).takeWhile(_._1 == patchId).map(_._2).toList
+            Overlap.buildChunkWithOverlapsThenApplyOp(patchId, patch, overlaps, overlap = 1)
+        }
+      }
+      curIterRDD = curIterRDD.zipPartitions(overlapRDD)(zipFunc).cache()
+      curIterRDD.count()
+
+      prevRDD.unpersist()
+    }
+    logInfo("Done")
+
+    /*
+        (0 until 10).foreach { i =>
+      logInfo(s"Iter ${i}")
+      val prevRDD = curIterRDD
+      val overlapRDD = curIterRDD.flatMap(x => Overlap.overlaps(x._1, x._2, overlap = 1))
+      curIterRDD = curIterRDD.cogroup(overlapRDD, partitioner = partitioner).filter(_._2._1.nonEmpty).map(x => Overlap.buildChunkWithOverlapsThenApplyOp(x._1, x._2._1.head, x._2._2, overlap = 1)).cache()
+      curIterRDD.count()
+
+      prevRDD.unpersist()
+    }
+    logInfo("Done")
+     */
 
   }
 
