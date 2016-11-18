@@ -16,6 +16,7 @@ import utils.{ChannelMajorArrayVectorizedImage, ImageMetadata, _}
 
 case class Overlap(originPatch: (Int, Int), data: DenseMatrix[Double])
 
+// -take patch id, in all dims
 object Overlap extends Serializable {
   def overlaps(patchId: (Int, Int), patch: DenseMatrix[Double], overlap: Int): Iterator[((Int, Int), Overlap)] = {
     // All overlapping patches: left, right, bottom, top, top-left, top-right, bottom-left, bottom-right
@@ -57,7 +58,6 @@ object Overlap extends Serializable {
 
   def buildChunkWithOverlapsThenApplyOp(patchId: (Int, Int), patch: DenseMatrix[Double], overlaps: TraversableOnce[Overlap], overlap: Int): ((Int, Int), DenseMatrix[Double]) = {
     //println(overlaps.size)//.map(_.originPatch).toList)
-    (patchId, patch)
 
     val matToDoOp = DenseMatrix.zeros[Double](patch.rows + overlap * 2, patch.cols + overlap * 2)
     matToDoOp(overlap until (patch.rows + overlap), overlap until (patch.cols + overlap)) := patch
@@ -83,8 +83,8 @@ object Overlap extends Serializable {
 
     var row = overlap
     while (row < patch.rows + overlap) {
-      var col = overlap
-      while (col < patch.cols + overlap) {
+      var col = 0
+      while (col < patch.cols + overlap * 2) {
         //val mx = max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))
 
         //if (matToDoOp(row, col) > 0) {
@@ -95,7 +95,7 @@ object Overlap extends Serializable {
           x += 1
         }
         // FIXME: For some reason the following line changes how much data gets written out....
-        //matToDoOp(row, col) = mx//max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))
+        matToDoOp(row, col) = mx//patch(row-overlap, col-overlap) = mx//max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))//
         //}
 
         col += 1
@@ -103,8 +103,8 @@ object Overlap extends Serializable {
       row += 1
     }
 
-    row = overlap
-    while (row < patch.rows + overlap) {
+    row = 0
+    while (row < patch.rows + overlap * 2) {
       var col = overlap
       while (col < patch.cols + overlap) {
         //val mx = max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))
@@ -117,7 +117,7 @@ object Overlap extends Serializable {
           y += 1
         }
         // FIXME: For some reason the following line changes how much data gets written out....
-        //matToDoOp(row, col) = mx//max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))
+        matToDoOp(row, col) = mx//max(matToDoOp((row - overlap) to (row + overlap), (col - overlap) to (col + overlap)))
         //}
 
         col += 1
@@ -156,9 +156,6 @@ object Overlap extends Serializable {
 
   }
 
-  def applyOpToChunkWithOverlaps(patch: ((Int, Int), DenseMatrix[Double]), overlaps: Iterable[((Int, Int), Overlap)], overlap: Int): ((Int, Int), DenseMatrix[Double]) = {
-    null
-  }
 }
 
 class SkySourceDetectSuite extends FunSuite with PipelineContext with Logging with Serializable {
