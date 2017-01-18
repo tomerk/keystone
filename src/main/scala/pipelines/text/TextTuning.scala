@@ -42,13 +42,14 @@ object TextTuning extends Logging {
 
     val regmatch = new JRegexFactory().create(regexp)*/
 
-    val factories = Seq(new OrgApacheRegexpRegexFactory, new JavaUtilPatternRegexFactory, new DkBricsAutomatonRegexFactory, new ComStevesoftPatRegexFactory, new JRegexFactory, new OroRegexFactory, new GnuRegexpReRegexFactory, new ComKarneimRegexFactory, new ComBasistechTclRegexFactory)
+    // TODO WARNME: REGEXES may not be threadsafe
+    val factories = Seq(new KmyRegexUtilRegexFactory, new OrgApacheRegexpRegexFactory, new JavaUtilPatternRegexFactory, new DkBricsAutomatonRegexFactory, new ComStevesoftPatRegexFactory, new JRegexFactory, new OroRegexFactory, new GnuRegexpReRegexFactory, new ComBasistechTclRegexFactory)
     val regexes = factories.map(x => (x.getClass.getSimpleName, x.create(regexp)))
     logInfo("PRepeth")
 
 
     val doc = text.first()
-    val splitDoc = doc.split('.')
+    val splitDoc = doc.split('\n')
     logInfo(s"Got this many sentences: ${splitDoc.length}")
     regexes.foreach { case (libName, matcher) =>
       val startTime = System.currentTimeMillis()
