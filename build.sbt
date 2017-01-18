@@ -26,6 +26,17 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-compress" % "1.7",
   "commons-io" % "commons-io" % "2.4",
   "org.scalanlp" % "breeze_2.10" % "0.11.2",
+  //"org.openjdk.jmh" % "jmh-core" % "1.11",
+  //"org.openjdk.jmh" % "jmh-generator-annprocess" % "1.11",
+  "dk.brics.automaton" % "automaton" % "1.11-8",
+  "jakarta-regexp" % "jakarta-regexp" % "1.4",
+  "com.stevesoft.pat" % "pat" % "1.5.3",
+  "net.sourceforge.jregex" % "jregex" % "1.2_01",
+  "oro" % "oro" % "2.0.8",
+  "gnu-regexp" % "gnu-regexp" % "1.1.4",
+  "jrexx" % "jrexx" % "1.1.1",
+  //"xerces" % "xercesImpl" % "2.11.0",
+  "com.basistech.tclre" % "tcl-regex" % "0.13.6",
   "com.google.guava" % "guava" % "14.0.1",
   "com.github.fommil.netlib" % "all" % "1.1.2" pomOnly(),
   "com.github.scopt" %% "scopt" % "3.3.0"
@@ -65,7 +76,8 @@ resolvers ++= Seq(
   "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + ".m2/repository",
   "Typesafe" at "http://repo.typesafe.com/typesafe/releases",
   "Cloudera Repository" at "https://repository.cloudera.com/artifactory/cloudera-repos/",
-  "Spray" at "http://repo.spray.cc"
+  "Spray" at "http://repo.spray.cc",
+  "eaio.com" at "http://repo.eaio.com/maven2"
 )
 
 resolvers += Resolver.sonatypeRepo("public")
