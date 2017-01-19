@@ -20,8 +20,8 @@ object TextTuning extends Logging {
 
   def run(sc: SparkContext, conf: NewsgroupsConfig): Pipeline[String, Int] = {
 
-    //val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").flatMap(x => Seq.fill(10)(x)).repartition(20)
-    val text = sc.wholeTextFiles("/Users/tomerk11/Desktop/texteth").map(_._2)
+    val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").repartition(20)
+    //val text = sc.wholeTextFiles("/Users/tomerk11/Desktop/texteth").map(_._2)
 
     logInfo("Starting to load")
     text.cache()
@@ -31,25 +31,44 @@ object TextTuning extends Logging {
     //logInfo(text.takeSample(false, 20)(0))
 
     logInfo("Bout to sorts!")
-    text.map(_.sortBy(x => - x)).count()
+    //text.map(_.sortBy(x => - x)).count()
     logInfo("Maybe doness")
 
     //val regexp = "\\s*([^\\s.!?]*)\\s+[a-z]*\\s+([a-z]*\\s+)?([a-z]*\\s+)?([a-z]*\\s+)?([^\\s.!?]+ed)\\s"//"(\\s+[^.!?]*[.!?])"
-    val regexp = ".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"//"(\\s+[^.!?]*[.!?])"
-
-    /*val flags = Pattern.CASE_INSENSITIVE | Pattern.DOTALL
-    val pattern = Pattern.compile(regexp, flags)
-
-    val regmatch = new JRegexFactory().create(regexp)*/
+    val regexp = ".*[Aa]lice.*"//".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"//"(\\s+[^.!?]*[.!?])"
 
     // TODO WARNME: REGEXES may not be threadsafe
-    val factories = Seq(new KmyRegexUtilRegexFactory, new OrgApacheRegexpRegexFactory, new JavaUtilPatternRegexFactory, new DkBricsAutomatonRegexFactory, new ComStevesoftPatRegexFactory, new JRegexFactory, new OroRegexFactory, new GnuRegexpReRegexFactory, new ComBasistechTclRegexFactory)
-    val regexes = factories.map(x => (x.getClass.getSimpleName, x.create(regexp)))
+    val factories = Seq[(String, Unit=>RegexFactory)](
+      ("KmyRegexUtilRegexFactory", _ => new KmyRegexUtilRegexFactory),
+      ("OrgApacheRegexpRegexFactory", _ => new OrgApacheRegexpRegexFactory),
+      ("JavaUtilPatternRegexFactory", _ => new JavaUtilPatternRegexFactory),
+      ("DkBricsAutomatonRegexFactory", _ => new DkBricsAutomatonRegexFactory),
+      ("ComStevesoftPatRegexFactory", _ => new ComStevesoftPatRegexFactory),
+      ("JRegexFactory", _ => new JRegexFactory),
+      ("OroRegexFactory", _ => new OroRegexFactory),
+      ("GnuRegexpReRegexFactory", _ => new GnuRegexpReRegexFactory),
+      ("ComBasistechTclRegexFactory", _ => new ComBasistechTclRegexFactory)
+    )
+    val regexes = factories.map(x => (x._1, x._2().create(regexp)))
     logInfo("PRepeth")
 
 
+    factories.foreach { case (libName, factory) =>
+      val startTime = System.currentTimeMillis()
+
+      val counts = text.mapPartitions(it => {
+        val matcher = factory().create(regexp)
+        it.filter(matcher.containsMatch)
+      }).count()
+
+      val endTime = System.currentTimeMillis()
+      logInfo(s"Finished $libName in ${endTime - startTime} ms, $counts")
+
+    }
+
+    /*
     val doc = text.first()
-    val splitDoc = doc.split('\n')
+    val splitDoc = doc.split("[\n!.?,\":;()\']+")
     logInfo(s"Got this many sentences: ${splitDoc.length}")
     regexes.foreach { case (libName, matcher) =>
       val startTime = System.currentTimeMillis()
@@ -61,10 +80,10 @@ object TextTuning extends Logging {
         }
       }
       val endTime = System.currentTimeMillis()
-      logInfo(s"Finished $libName in ${endTime - startTime}, $counts")
+      logInfo(s"Finished $libName in ${endTime - startTime} ms, $counts")
 
     }
-
+*/
     /*(0 until 1).foreach { _ =>
       val startTime = System.currentTimeMillis()
       for (sent <- splitDoc) {
