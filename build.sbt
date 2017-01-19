@@ -26,6 +26,7 @@ libraryDependencies ++= Seq(
   "org.apache.commons" % "commons-compress" % "1.7",
   "commons-io" % "commons-io" % "2.4",
   "org.scalanlp" % "breeze_2.10" % "0.11.2",
+  "org.scalanlp" % "breeze-viz_2.10" % "0.11.2",
   //"org.openjdk.jmh" % "jmh-core" % "1.11",
   //"org.openjdk.jmh" % "jmh-generator-annprocess" % "1.11",
   "dk.brics.automaton" % "automaton" % "1.11-8",

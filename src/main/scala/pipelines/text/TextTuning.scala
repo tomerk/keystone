@@ -1,5 +1,6 @@
 package pipelines.text
 
+import java.io.{File, FileOutputStream, ObjectOutputStream}
 import java.util.regex.Pattern
 
 import breeze.linalg.SparseVector
@@ -15,18 +16,22 @@ import pipelines.Logging
 import scopt.OptionParser
 import workflow.Pipeline
 
+import scala.reflect.io.Directory
+
+case class Result(index: Long, matches: Boolean, elapsed: Long)
+
 object TextTuning extends Logging {
   val appName = "NewsgroupsPipeline"
 
   def run(sc: SparkContext, conf: NewsgroupsConfig): Pipeline[String, Int] = {
 
-    val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").repartition(20)
+    val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").repartition(4).zipWithIndex()
     //val text = sc.wholeTextFiles("/Users/tomerk11/Desktop/texteth").map(_._2)
 
     logInfo("Starting to load")
     text.cache()
     logInfo(s"There are ${text.count()} documents.")
-    logInfo(s"There are ${text.map(_.length).mean()} characters per document.")
+    logInfo(s"There are ${text.map(_._1.length).mean()} characters per document.")
     logInfo(text.count().toString)
     //logInfo(text.takeSample(false, 20)(0))
 
@@ -35,34 +40,58 @@ object TextTuning extends Logging {
     logInfo("Maybe doness")
 
     //val regexp = "\\s*([^\\s.!?]*)\\s+[a-z]*\\s+([a-z]*\\s+)?([a-z]*\\s+)?([a-z]*\\s+)?([^\\s.!?]+ed)\\s"//"(\\s+[^.!?]*[.!?])"
-    val regexp = ".*[Aa]lice.*"//".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"//"(\\s+[^.!?]*[.!?])"
+    val regexp = ".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"
+//    val regexp = ".*[Aa]lice.*"//".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"//"(\\s+[^.!?]*[.!?])"
 
     // TODO WARNME: REGEXES may not be threadsafe
     val factories = Seq[(String, Unit=>RegexFactory)](
       ("KmyRegexUtilRegexFactory", _ => new KmyRegexUtilRegexFactory),
-      ("OrgApacheRegexpRegexFactory", _ => new OrgApacheRegexpRegexFactory),
-      ("JavaUtilPatternRegexFactory", _ => new JavaUtilPatternRegexFactory),
+      ("ComBasistechTclRegexFactory", _ => new ComBasistechTclRegexFactory),
+
+
       ("DkBricsAutomatonRegexFactory", _ => new DkBricsAutomatonRegexFactory),
-      ("ComStevesoftPatRegexFactory", _ => new ComStevesoftPatRegexFactory),
       ("JRegexFactory", _ => new JRegexFactory),
       ("OroRegexFactory", _ => new OroRegexFactory),
-      ("GnuRegexpReRegexFactory", _ => new GnuRegexpReRegexFactory),
-      ("ComBasistechTclRegexFactory", _ => new ComBasistechTclRegexFactory)
+      ("JavaUtilPatternRegexFactory", _ => new JavaUtilPatternRegexFactory),
+      ("OrgApacheRegexpRegexFactory", _ => new OrgApacheRegexpRegexFactory),
+      ("ComStevesoftPatRegexFactory", _ => new ComStevesoftPatRegexFactory)
+
+      //("GnuRegexpReRegexFactory", _ => new GnuRegexpReRegexFactory)
     )
     val regexes = factories.map(x => (x._1, x._2().create(regexp)))
     logInfo("PRepeth")
 
 
-    factories.foreach { case (libName, factory) =>
-      val startTime = System.currentTimeMillis()
+    val dir = Directory.makeTemp("Regex_traces", null, new File("/Users/tomerk11/Desktop"))
+    logInfo(s"Storing traces in ${dir.toString()}")
 
-      val counts = text.mapPartitions(it => {
+    factories.foreach { case (libName, factory) =>
+      val startedTime = System.currentTimeMillis()
+
+      val traceRDD = text.mapPartitions(it => {
         val matcher = factory().create(regexp)
-        it.filter(matcher.containsMatch)
-      }).count()
+        it.map{ x =>
+          val startTime = System.nanoTime()
+
+          val matched = matcher.containsMatch(x._1)
+
+          val endTime = System.nanoTime()
+
+          val elapsed = endTime - startTime
+
+          Result(x._2, matched, elapsed)
+        }
+      })
+
+      val trace = traceRDD.collect.sortBy(_.index)
+
+      val fos = new FileOutputStream(s"${dir.toString()}/$libName.trace")
+      val oos = new ObjectOutputStream(fos)
+      oos.writeObject(trace)
+      oos.close()
 
       val endTime = System.currentTimeMillis()
-      logInfo(s"Finished $libName in ${endTime - startTime} ms, $counts")
+      logInfo(s"Finished $libName in ${endTime - startedTime} ms")
 
     }
 
@@ -100,15 +129,14 @@ object TextTuning extends Logging {
 
     }*/
 
-    logInfo(s"Maybe doness NAXT? ${text.filter(_.matches(".*<a.*?\\shref\\s*=\\s*([\\\"\\']*)(.*?)([\\\"\\'\\s].*?>|>).*")).count()}")
+    //logInfo(s"Maybe doness NAXT? ${text.filter(_.matches(".*<a.*?\\shref\\s*=\\s*([\\\"\\']*)(.*?)([\\\"\\'\\s].*?>|>).*")).count()}")
 
-    NGramsFeaturizer(1 to 5).apply(text.map(_.split("[\\p{Punct}\\s]+").toSeq)).count()
+    //NGramsFeaturizer(1 to 5).apply(text.map(_.split("[\\p{Punct}\\s]+").toSeq)).count()
     logInfo("Still not doness")
 
     import Ordering.Implicits._
-    NGramsFeaturizer(1 to 5).apply(text.map(_.split("[\\p{Punct}\\s]+").toSeq)).map(_.sorted).count()
+    //NGramsFeaturizer(1 to 5).apply(text.map(_.split("[\\p{Punct}\\s]+").toSeq)).map(_.sorted).count()
     logInfo("Okay now doness")
-    logInfo("DA FUCKKK IS GOING ON")
 
     null
 
