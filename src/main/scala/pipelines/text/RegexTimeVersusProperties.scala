@@ -43,7 +43,7 @@ object RegexTimeVersusProperties extends Logging {
 
     traces.foreach {
       case (name, rawTrace) =>
-        val trace = DenseVector(rawTrace.filter(x => true).map(_.elapsed.toDouble / 1000000.0))
+        val trace = DenseVector(rawTrace.filter(x => x.matches).map(_.elapsed.toDouble / 1000000.0))
         logInfo(s"\n$name")
         logInfo(s"length: ${trace.length}")
         logInfo(s"sum: ${sum(trace)}")
@@ -54,15 +54,20 @@ object RegexTimeVersusProperties extends Logging {
         val indices = DenseVector((0 until trace.length).map(_.toDouble):_*)
         val containsED = DenseVector(rawTrace.map(x => if (x.containsED) 1.0 else 1000.0):_*)
         val matchesRegex = DenseVector(rawTrace.map(x => if (x.matches) 1000.0 else -1000.0):_*)
-        val lengths = DenseVector(rawTrace.filter(x => true).map(x => x.wordCount.toDouble):_*)
+        val lengths = DenseVector(rawTrace.filter(x => x.matches).map(x => x.length.toDouble/10.0):_*)
 
         logInfo(s"${lengths.length}, ${trace.length}")
-        val scatt = scatter(matchesRegex, trace, {_ => 40}, name = name, colors = {_ => colors(name)})
-        p += scatt
+        //val scatt = scatter(matchesRegex, trace, {_ => 40}, name = name, colors = {_ => colors(name)})
+        //p += scatt
         //p += plot(DenseVector((0 until trace.length).map(_.toDouble).sliding(5).map(_.head).toArray), DenseVector(rawTrace.map(_.elapsed.toDouble / 1000000.0).sliding(5).map(x => median(DenseVector(x))).toArray))
         val fa = Figure()
         val pa = fa.subplot(0)
-        pa += scatt
+        pa += scatter(lengths, trace, {_ => 40}, name = name, colors = {_ => java.awt.Color.GREEN})
+
+        val trace2 = DenseVector(rawTrace.filter(x => !x.matches).map(_.elapsed.toDouble / 1000000.0))
+        val lengths2 = DenseVector(rawTrace.filter(x => !x.matches).map(x => x.length.toDouble/10.0):_*)
+        pa += scatter(lengths2, trace2, {_ => 40}, name = name, colors = {_ => java.awt.Color.RED})
+
         pa.xlabel = "Document Index"
         pa.ylabel = "Time in milliseconds"
         pa.title = name
@@ -77,7 +82,7 @@ object RegexTimeVersusProperties extends Logging {
     p.title = "blah"
     // FIXME: LEGEND IS BUGGY AND SAYS WRONG COLOR
     //p.legend = (true)
-    f.saveas(s"/Users/tomerk11/Desktop/trace_visualizations/500parts/blah.png")
+    //f.saveas(s"/Users/tomerk11/Desktop/trace_visualizations/500parts/blah.png")
 
     traces.indices.foreach { i =>
       ((i + 1) until traces.length).foreach { j =>
