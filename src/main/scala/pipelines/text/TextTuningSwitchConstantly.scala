@@ -73,6 +73,10 @@ object TextTuningSwitchConstantly extends Logging {
 
       it.flatMap { x =>
         matchers.map { case (libName, matcher) =>
+          val containsED = x._1.contains("ed")
+          val wordCount = x._1.split("[ \t\n\r]+").length
+          val length = x._1.length
+
           val startTime = System.nanoTime()
 
           val matched = matcher.containsMatch(x._1)
@@ -81,7 +85,7 @@ object TextTuningSwitchConstantly extends Logging {
 
           val elapsed = endTime - startTime
 
-          (libName, Result(x._2, matched, elapsed))
+          (libName, Result(x._2, matched, elapsed, length, containsED, wordCount))
         }
       }
     }).collect()

@@ -18,13 +18,14 @@ import workflow.Pipeline
 
 import scala.reflect.io.Directory
 
-case class Result(index: Long, matches: Boolean, elapsed: Long)
+case class Result(index: Long, matches: Boolean, elapsed: Long, length: Int, containsED: Boolean, wordCount: Int)
 
 object TextTuning extends Logging {
   val appName = "NewsgroupsPipeline"
 
   def run(sc: SparkContext, conf: NewsgroupsConfig): Pipeline[String, Int] = {
 
+    println("Halp?")
     val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").repartition(4).zipWithIndex()
     //val text = sc.wholeTextFiles("/Users/tomerk11/Desktop/texteth").map(_._2)
 
@@ -70,7 +71,15 @@ object TextTuning extends Logging {
 
       val traceRDD = text.mapPartitions(it => {
         val matcher = factory().create(regexp)
+        val aToTMatcher = new JavaUtilPatternRegexFactory().create(".*[A-Ta-t].*")
+        val aToZMatcher = new JavaUtilPatternRegexFactory().create(".*[A-Za-z].*")
         it.map{ x =>
+          val containsED = x._1.contains("ed")
+          val containsAtoT = aToTMatcher.containsMatch(x._1)
+          val containsAtoZ = aToZMatcher.containsMatch(x._1)
+          val wordCount = x._1.split("[ \t\n\r]+").length
+
+          val length = x._1.length
           val startTime = System.nanoTime()
 
           val matched = matcher.containsMatch(x._1)
@@ -79,7 +88,7 @@ object TextTuning extends Logging {
 
           val elapsed = endTime - startTime
 
-          Result(x._2, matched, elapsed)
+          Result(x._2, matched, elapsed, length, containsED, wordCount)
         }
       })
 
@@ -188,6 +197,7 @@ object TextTuning extends Logging {
    * @param args
    */
   def main(args: Array[String]) = {
+    println("Halp?")
     val conf = new SparkConf().setAppName(appName)
     conf.setIfMissing("spark.master", "local[4]") // This is a fallback if things aren't set via spark submit.
 
