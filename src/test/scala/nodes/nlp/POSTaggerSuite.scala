@@ -1,5 +1,5 @@
 package nodes.nlp
-
+/*
 import epic.sequences.{CRF, TaggedSequence}
 import epic.trees.AnnotatedLabel
 import org.apache.spark.SparkContext
@@ -58,3 +58,4 @@ class POSTaggerSuite extends FunSuite
   }
 
 }
+*/

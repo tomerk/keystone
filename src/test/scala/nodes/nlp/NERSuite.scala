@@ -1,5 +1,5 @@
 package nodes.nlp
-
+/*
 import epic.sequences.{Segmentation, SemiCRF}
 import org.apache.spark.SparkContext
 import org.mockito.Mockito._
@@ -55,3 +55,4 @@ class NERSuite extends FunSuite
   }
 
 }
+*/
