@@ -137,4 +137,87 @@ class ConvolverSuite extends FunSuite with PipelineContext with Logging {
     assert(testImg.equals(chans(0)), "Convolved images should match.")
 
   }
+
+  test("Loop convolutions should match scipy") {
+    val im = TestUtils.loadTestImage("images/gantrycrane.png")
+
+    val kimg = new ChannelMajorArrayVectorizedImage(Array.fill[Double](27)(0), ImageMetadata(3,3,3))
+    val kimg2 = new ChannelMajorArrayVectorizedImage(Array.fill[Double](27)(0), ImageMetadata(3,3,3))
+    var i = 0
+    for (
+      x <- 0 until 3;
+      y <- 0 until 3;
+      c <- 0 until 3
+    ) {
+      kimg.put(x,y,2-c,i.toDouble) //Channel order is reversed to match python.
+      i+=1
+    }
+
+    kimg2.put(0,0,0,1.0)
+    kimg2.put(0,0,0,2.0)
+    kimg2.put(2,0,1,1.0)
+
+    val conv = LoopConvolver(Array(kimg, kimg2), flipFilters = true)
+    val convimg = conv(im)
+
+    val testImgRaw = csvread(new File(TestUtils.getTestResourceFileName("images/convolved.gantrycrane.csv")))
+    val testImg = new ColumnMajorArrayVectorizedImage(testImgRaw(::,2).toArray,
+      ImageMetadata(max(testImgRaw(::,0)).toInt+1, max(testImgRaw(::,1)).toInt+1, 1))
+
+    val chans = ImageUtils.splitChannels(convimg)
+
+    val pix = for ( x <- 0 until testImg.metadata.xDim;
+                    y <- 0 until testImg.metadata.yDim
+    ) yield {
+      (testImg.get(x,y,0), chans(0).get(x,y,0))
+    }
+
+    ImageUtils.writeImage("test.gantrycrane.png", chans(0), true)
+
+    assert(testImg.metadata == chans(0).metadata, "Convolved images should have same metadata.")
+    assert(testImg.equals(chans(0)), "Convolved images should match.")
+
+  }
+
+  test("FFT convolutions should match scipy") {
+    val im = TestUtils.loadTestImage("images/gantrycrane.png")
+
+    val kimg = new ChannelMajorArrayVectorizedImage(Array.fill[Double](27)(0), ImageMetadata(3,3,3))
+    val kimg2 = new ChannelMajorArrayVectorizedImage(Array.fill[Double](27)(0), ImageMetadata(3,3,3))
+    var i = 0
+    for (
+      x <- 0 until 3;
+      y <- 0 until 3;
+      c <- 0 until 3
+    ) {
+      kimg.put(x,y,2-c,i.toDouble) //Channel order is reversed to match python.
+      i+=1
+    }
+
+    kimg2.put(0,0,0,1.0)
+    kimg2.put(0,0,0,2.0)
+    kimg2.put(2,0,1,1.0)
+
+    val conv = FFTConvolver(Array(kimg, kimg2), flipFilters = true)
+    val convimg = conv(im)
+
+    val testImgRaw = csvread(new File(TestUtils.getTestResourceFileName("images/convolved.gantrycrane.csv")))
+    val testImg = new ColumnMajorArrayVectorizedImage(testImgRaw(::,2).toArray,
+      ImageMetadata(max(testImgRaw(::,0)).toInt+1, max(testImgRaw(::,1)).toInt+1, 1))
+
+    val chans = ImageUtils.splitChannels(convimg)
+
+    val pix = for ( x <- 0 until testImg.metadata.xDim;
+                    y <- 0 until testImg.metadata.yDim
+    ) yield {
+      (testImg.get(x,y,0), chans(0).get(x,y,0))
+    }
+
+    ImageUtils.writeImage("test.gantrycrane.png", chans(0), true)
+
+    assert(testImg.metadata == chans(0).metadata, "Convolved images should have same metadata.")
+    assert(testImg.equals(chans(0)), "Convolved images should match.")
+
+  }
+
 }

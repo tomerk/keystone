@@ -13,12 +13,34 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
 
   case class TestParam(name: String, size: (Int, Int, Int), kernelSize: Int, numKernels: Int, poolSize: Int, poolStride: Int)
   val tests = Array(
-    TestParam("Cifar100", (32,32,3), 6, 100, 13, 14),
-    TestParam("Cifar1000", (32,32,3), 6, 1000, 13, 14),
-    TestParam("Cifar10000", (32,32,3), 6, 10000, 13, 14),
-    TestParam("ImageNet", (256,256,3), 6, 100, (256-5)/2, (256-5)/2),
-    TestParam("SolarFlares", (256,256,12), 6, 100, (256-5)/12, (256-5)/12),
-    TestParam("ConvolvedSolarFlares", (251,251,100), 6, 100, 251/12, 251/12)
+    TestParam("Cifar1", (32,32,3), 6, 1, 13, 14),
+    TestParam("Cifar2", (32,32,3), 6, 2, 13, 14),
+    TestParam("Cifar3", (32,32,3), 6, 3, 13, 14),
+    TestParam("Cifar4", (32,32,3), 6, 4, 13, 14),
+    TestParam("Cifar5", (32,32,3), 6, 5, 13, 14),
+    //TestParam("Cifar10", (32,32,3), 6, 10, 13, 14),
+    TestParam("ImageNet1", (256,256,3), 6, 1, 13, 14),
+    TestParam("ImageNet2", (256,256,3), 6, 2, 13, 14),
+    TestParam("ImageNet3", (256,256,3), 6, 3, 13, 14),
+    TestParam("ImageNet4", (256,256,3), 6, 4, 13, 14),
+    TestParam("ImageNet5", (256,256,3), 6, 5, 13, 14),
+    /*TestParam("BigImageNet1", (1024,1024,3), 12, 1, 13, 14),
+    TestParam("BigImageNet2", (1024,1024,3), 12, 2, 13, 14),
+    TestParam("BigImageNet3", (1024,1024,3), 12, 3, 13, 14),
+    TestParam("BigImageNet4", (1024,1024,3), 12, 4, 13, 14),
+    TestParam("BigImageNet5", (1024,1024,3), 12, 5, 13, 14),*/
+
+    TestParam("ImageNet1-12", (256,256,3), 12, 1, 13, 14),
+    TestParam("ImageNet2-12", (256,256,3), 12, 2, 13, 14),
+    TestParam("ImageNet3-12", (256,256,3), 12, 3, 13, 14),
+    TestParam("ImageNet4-12", (256,256,3), 12, 4, 13, 14),
+    TestParam("ImageNet5-12", (256,256,3), 12, 5, 13, 14)
+    //TestParam("Cifar100", (32,32,3), 6, 100, 13, 14),
+    //TestParam("Cifar1000", (32,32,3), 6, 1000, 13, 14),
+    //TestParam("Cifar10000", (32,32,3), 6, 10000, 13, 14),
+    //TestParam("ImageNet", (256,256,3), 6, 100, (256-5)/2, (256-5)/2)
+    //TestParam("SolarFlares", (256,256,12), 6, 100, (256-5)/12, (256-5)/12),
+    //TestParam("ConvolvedSolarFlares", (251,251,100), 6, 100, 251/12, 251/12)
     //Todo (sparks) Figure out a good way to "uncomment" this via a config parameter when we want bigger tests.
     //TestParam("SolarFlares2", (256,256,12), 5, 1024, (256-4)/12, (256-4)/12)
 
@@ -134,7 +156,7 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
 
 
     logInfo(Seq("name","max(flops)","median(flops)","stddev(flops)").mkString(","))
-    groups.foreach { case (name, values) =>
+    groups.toSeq.sortBy(_._1).foreach { case (name, values) =>
       val flops = DenseVector(values.map(_._4):_*)
       val maxf = max(flops)
       val medf = median(flops)
@@ -142,4 +164,87 @@ class ImageBenchMarkSuite extends FunSuite with Logging {
       logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f")
     }
   }
+
+  test("Convolution Loop Benchmarks") {
+    def convTime(x: Image, t: TestParam) = {
+      val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
+      val conv = new LoopConvolver(filters)
+
+      val start = System.nanoTime
+      val res = conv(x)
+      val elapsed = System.nanoTime - start
+
+      logInfo(s"Took: $elapsed")
+      elapsed
+    }
+
+    val res = for(
+      iter <- 1 to 5;
+      t <- tests
+    ) yield {
+      val img = genChannelMajorArrayVectorizedImage(t.size._1, t.size._2, t.size._3) //Standard grayScale format.
+
+      val flops = (t.size._1.toLong-t.kernelSize+1)*(t.size._2-t.kernelSize+1)*
+        t.size._3*t.kernelSize*t.kernelSize*
+        t.numKernels
+
+      val t1 = convTime(img, t)
+
+      logDebug(s"${t.name},$t1,$flops,${2.0*flops.toDouble/t1}")
+      (t.name, t1, flops, (2.0*flops.toDouble/t1))
+    }
+    val groups = res.groupBy(_._1)
+
+
+    logInfo(Seq("name","max(flops)","median(flops)","stddev(flops)").mkString(","))
+    groups.toSeq.sortBy(_._1).foreach { case (name, values) =>
+      val flops = DenseVector(values.map(_._4):_*)
+      val maxf = max(flops)
+      val medf = median(flops)
+      val stddevf = stddev(flops)
+      logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f")
+    }
+  }
+
+  test("FFT Convolution Benchmarks") {
+    def convTime(x: Image, t: TestParam) = {
+      val filters = DenseMatrix.rand[Double](t.numKernels, t.kernelSize*t.kernelSize*t.size._3)
+      val conv = FFTConvolver(filters, t.kernelSize, t.size._3)
+
+      val start = System.nanoTime
+      val res = conv(x)
+      val elapsed = System.nanoTime - start
+
+      logInfo(s"Took: $elapsed")
+      elapsed
+    }
+
+    val res = for(
+      iter <- 1 to 5;
+      t <- tests
+    ) yield {
+      val img = genChannelMajorArrayVectorizedImage(t.size._1, t.size._2, t.size._3) //Standard grayScale format.
+
+      val flops = (t.size._1.toLong-t.kernelSize+1)*(t.size._2-t.kernelSize+1)*
+        t.size._3*t.kernelSize*t.kernelSize*
+        t.numKernels
+
+      val t1 = convTime(img, t)
+
+      logDebug(s"${t.name},$t1,$flops,${2.0*flops.toDouble/t1}")
+      (t.name, t1, flops, (2.0*flops.toDouble/t1))
+    }
+    val groups = res.groupBy(_._1)
+
+
+    logInfo(Seq("name","max(flops)","median(flops)","stddev(flops)").mkString(","))
+    groups.toSeq.sortBy(_._1).foreach { case (name, values) =>
+      val flops = DenseVector(values.map(_._4):_*)
+      val maxf = max(flops)
+      val medf = median(flops)
+      val stddevf = stddev(flops)
+      logInfo(f"$name,$maxf%2.3f,$medf%2.3f,$stddevf%2.3f")
+    }
+  }
+
 }
