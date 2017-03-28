@@ -14,8 +14,8 @@ public final class ComKarneimRegexFactory extends RegexFactory {
                 return p.contains(string);
             }
 
-            //@Override
-            public Iterable<String> getMatches(String string, int group) {
+            @Override
+            public Iterable<String[]> getMatches(String string, int[] groups) {
                 throw new UnsupportedOperationException();
             }
         };

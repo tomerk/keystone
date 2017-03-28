@@ -29,17 +29,22 @@ public final class OroRegexFactory extends RegexFactory {
                 return perl5Matcher.matches(string, regexpr);
             }
 
-            //@Override
-            public Iterable<String> getMatches(String string, int group) {
-                ArrayList<String> output = new ArrayList<>();
+            @Override
+            public Iterable<String[]> getMatches(String string, int[] groups) {
+                int numGroups = groups.length;
+                ArrayList<String[]> matches = new ArrayList<>();
                 PatternMatcherInput input = new PatternMatcherInput(string);
                 while(perl5Matcher.contains(input, regexpr)) {
                     MatchResult result = perl5Matcher.getMatch();
-                    output.add(result.group(group));
-                    // Perform whatever processing on the result you want.
+
+                    String[] matchArray = new String[numGroups];
+                    for (int i = 0; i < numGroups; i++) {
+                        matchArray[i] = result.group(groups[i]);
+                    }
+                    matches.add(matchArray);
                 }
 
-                return output;
+                return matches;
             }
         };
     }

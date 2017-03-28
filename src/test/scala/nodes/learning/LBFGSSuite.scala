@@ -14,7 +14,7 @@ import org.apache.spark.{SparkContext, rdd}
 import org.scalatest.FunSuite
 import pipelines.Logging
 import utils.{MatrixUtils, Stats, TestUtils}
-import workflow.{MergerSort, PipelineContext, ZipfDistribution}
+import workflow.{PipelineContext, ZipfDistribution}
 
 class LBFGSSuite extends FunSuite with PipelineContext with Logging {
   test("Solve a dense linear system (fit intercept)") {

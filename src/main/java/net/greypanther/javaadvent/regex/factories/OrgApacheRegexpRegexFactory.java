@@ -2,6 +2,8 @@ package net.greypanther.javaadvent.regex.factories;
 
 import net.greypanther.javaadvent.regex.Regex;
 
+import java.util.ArrayList;
+
 public class OrgApacheRegexpRegexFactory extends RegexFactory {
     @Override
     public Regex create(String pattern) {
@@ -22,6 +24,11 @@ public class OrgApacheRegexpRegexFactory extends RegexFactory {
                 } catch (Exception | Error ex) {
                     return false;
                 }
+            }
+
+            @Override
+            public Iterable<String[]> getMatches(String string, int[] groups) {
+                throw new UnsupportedOperationException();
             }
         };
     }

@@ -2,6 +2,7 @@ package pipelines.text
 
 import java.io.{File, FileOutputStream, ObjectOutputStream}
 import java.util.regex.Pattern
+import scala.collection.JavaConverters._
 
 import breeze.linalg.SparseVector
 import evaluation.MulticlassClassifierEvaluator
@@ -41,26 +42,39 @@ object TextTuning extends Logging {
     logInfo("Maybe doness")
 
     //val regexp = "\\s*([^\\s.!?]*)\\s+[a-z]*\\s+([a-z]*\\s+)?([a-z]*\\s+)?([a-z]*\\s+)?([^\\s.!?]+ed)\\s"//"(\\s+[^.!?]*[.!?])"
-    val regexp = ".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"
+    // For Super slow, just add the ed and .* at the ends: val regexp = ".*[A-Ta-t][ \t\n\r]+([A-Za-z]+ed)[ \t\n\r]+.*"
+    val regexp = "[ \t\n\r]*([A-Za-z]+)[ \t\n\r]+([A-Za-z]+)[ \t\n\r]+([A-Za-z]+ed)[ \t\n\r]+"
 //    val regexp = ".*[Aa]lice.*"//".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"//"(\\s+[^.!?]*[.!?])"
 
     // TODO WARNME: REGEXES may not be threadsafe
     val factories = Seq[(String, Unit=>RegexFactory)](
-      ("KmyRegexUtilRegexFactory", _ => new KmyRegexUtilRegexFactory),
       ("ComBasistechTclRegexFactory", _ => new ComBasistechTclRegexFactory),
-
-
       ("DkBricsAutomatonRegexFactory", _ => new DkBricsAutomatonRegexFactory),
       ("JRegexFactory", _ => new JRegexFactory),
       ("OroRegexFactory", _ => new OroRegexFactory),
-      ("JavaUtilPatternRegexFactory", _ => new JavaUtilPatternRegexFactory),
-      ("OrgApacheRegexpRegexFactory", _ => new OrgApacheRegexpRegexFactory),
-      ("ComStevesoftPatRegexFactory", _ => new ComStevesoftPatRegexFactory)
+      ("JavaUtilPatternRegexFactory", _ => new JavaUtilPatternRegexFactory)
 
+      // The following don't support find all matches
+      //("OrgApacheRegexpRegexFactory", _ => new OrgApacheRegexpRegexFactory),
+      //("ComStevesoftPatRegexFactory", _ => new ComStevesoftPatRegexFactory),
+      //("KmyRegexUtilRegexFactory", _ => new KmyRegexUtilRegexFactory),
       //("GnuRegexpReRegexFactory", _ => new GnuRegexpReRegexFactory)
     )
     val regexes = factories.map(x => (x._1, x._2().create(regexp)))
     logInfo("PRepeth")
+
+
+    val doc = text.first()
+    factories.foreach { case (libName, factory) =>
+      val startedTime = System.currentTimeMillis()
+
+      val matcher = factory().create(regexp)
+      val matches = matcher.getMatches(doc._1, Array(0))
+
+      val endTime = System.currentTimeMillis()
+      logInfo(s"Finished $libName in ${endTime - startedTime} ms")
+
+    }
 
 
     val dir = Directory.makeTemp("Regex_traces", null, new File("/Users/tomerk11/Desktop"))
@@ -71,24 +85,20 @@ object TextTuning extends Logging {
 
       val traceRDD = text.mapPartitions(it => {
         val matcher = factory().create(regexp)
-        val aToTMatcher = new JavaUtilPatternRegexFactory().create(".*[A-Ta-t].*")
-        val aToZMatcher = new JavaUtilPatternRegexFactory().create(".*[A-Za-z].*")
         it.map{ x =>
           val containsED = x._1.contains("ed")
-          val containsAtoT = aToTMatcher.containsMatch(x._1)
-          val containsAtoZ = aToZMatcher.containsMatch(x._1)
           val wordCount = x._1.split("[ \t\n\r]+").length
 
           val length = x._1.length
           val startTime = System.nanoTime()
 
-          val matched = matcher.containsMatch(x._1)
+          val matched = matcher.getMatches(x._1, Array(0))
 
           val endTime = System.nanoTime()
 
           val elapsed = endTime - startTime
 
-          Result(x._2, matched, elapsed, length, containsED, wordCount)
+          Result(x._2, matched.asScala.nonEmpty, elapsed, length, containsED, wordCount)
         }
       })
 
@@ -197,7 +207,6 @@ object TextTuning extends Logging {
    * @param args
    */
   def main(args: Array[String]) = {
-    println("Halp?")
     val conf = new SparkConf().setAppName(appName)
     conf.setIfMissing("spark.master", "local[4]") // This is a fallback if things aren't set via spark submit.
 
