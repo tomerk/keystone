@@ -27,11 +27,12 @@ object TextTuning extends Logging {
   def run(sc: SparkContext, conf: NewsgroupsConfig): Pipeline[String, Int] = {
 
     println("Halp?")
-    val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").repartition(4).zipWithIndex()
-    //val text = sc.wholeTextFiles("/Users/tomerk11/Desktop/texteth").map(_._2)
+    //val text = sc.textFile("/Users/tomerk11/Desktop/newsgroups-whole-files-to-line/*").repartition(4).cache().zipWithIndex()
+    // find . -name '*:*' | while read f; do mv "$f" "${f//:/}"; done
+    val text = sc.wholeTextFiles("/Users/tomerk11/Downloads/Gutenberg/txt/*").map(_._2).repartition(4).cache().zipWithIndex()
 
     logInfo("Starting to load")
-    text.cache()
+    text.count()
     logInfo(s"There are ${text.count()} documents.")
     logInfo(s"There are ${text.map(_._1.length).mean()} characters per document.")
     logInfo(text.count().toString)
@@ -41,11 +42,11 @@ object TextTuning extends Logging {
     //text.map(_.sortBy(x => - x)).count()
     logInfo("Maybe doness")
 
-    //val regexp = "\\s*([^\\s.!?]*)\\s+[a-z]*\\s+([a-z]*\\s+)?([a-z]*\\s+)?([a-z]*\\s+)?([^\\s.!?]+ed)\\s"//"(\\s+[^.!?]*[.!?])"
     // For Super slow, just add the ed and .* at the ends: val regexp = ".*[A-Ta-t][ \t\n\r]+([A-Za-z]+ed)[ \t\n\r]+.*"
-    val regexp = "[ \t\n\r]*([A-Za-z]+)[ \t\n\r]+([A-Za-z]+)[ \t\n\r]+([A-Za-z]+ed)[ \t\n\r]+"
-//    val regexp = ".*[Aa]lice.*"//".*[A-Ta-t]([ \t\n\r]+[A-Za-z]+)?([ \t\n\r]+[A-Za-z]+)?[ \t\n\r]+([A-Za-z]+ed).*"//"(\\s+[^.!?]*[.!?])"
-
+    //val regexp = "[ \t\n\r]*([A-Za-z]+r)[ \t\n\r]+([A-Za-z]+[ \t\n\r]+)?([A-Za-z]+[ \t\n\r]+)?([A-Za-z]+ed)[ \t\n\r]+"
+    val regexp = "([A-Za-z]+ed)[ \t\n\r]+([A-Za-z]*[^e][^d][ \t\n\r]+)?([A-Za-z]*[^e][^d][ \t\n\r]+)?([A-Za-z]*[^e][^d][ \t\n\r]+)?([A-Za-z]+ing)[ \t\n\r]+"
+    // This is a regex (that doesn't work right with DKbrics) for email I found online: http://emailregex.com
+    //val regexp = "(?:[a-z0-9!#$%&'*+/=?^_`~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])"
     // TODO WARNME: REGEXES may not be threadsafe
     val factories = Seq[(String, Unit=>RegexFactory)](
       ("ComBasistechTclRegexFactory", _ => new ComBasistechTclRegexFactory),

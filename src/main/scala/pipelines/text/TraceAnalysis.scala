@@ -17,7 +17,8 @@ object TraceAnalysis extends Logging {
     //val dirPath = "/Users/tomerk11/Desktop/Regex_traces4436180565598422827.tmp" // 500 partitions switching often
     //val dirPath = "/Users/tomerk11/Desktop/Regex_traces1790765659707268971.tmp" // Normal 500 partitions
     //val dirPath = "/Users/tomerk11/Desktop/Regex_traces4777448709145877024.tmp" // 4 partitions switching often
-    val dirPath = args.head // 4 partitions switching often
+    //val dirPath = args.head // 4 partitions switching often
+    val dirPath = "/Users/tomerk11/Desktop/Regex_traces3839215267253318110.tmp"
     val dir = new Directory(new File(dirPath))
     val traceFiles = dir.files.filter(_.path.endsWith(".trace"))
     val traces = traceFiles.toList.map { file =>
@@ -36,7 +37,7 @@ object TraceAnalysis extends Logging {
         logInfo(s"length: ${trace.length}")
         logInfo(s"sum: ${sum(trace)}")
         logInfo(s"mean: ${mean(trace)}")
-        logInfo(s"meanOfSample: ${mean(trace(1 to 15000))}")
+        logInfo(s"meanOfSample: ${mean(trace(1 to 1000))}")
         logInfo(s"variance: ${variance(trace)}")
 
         val f = Figure()
